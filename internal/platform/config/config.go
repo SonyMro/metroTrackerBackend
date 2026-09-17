@@ -2,8 +2,11 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strconv"
+
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -16,7 +19,16 @@ type Config struct {
 }
 
 func Load() (Config, error) {
-
+	// Load local development values without overriding variables from the shell.
+	// A missing .env is valid in production, where the environment is injected externally.
+	err := godotenv.Load()
+	if err != nil {
+		// Es útil manejar el error por si el archivo no existe.
+		// En desarrollo, podrías querer advertir al usuario.
+		fmt.Printf("⚠️ Advertencia: No se pudo cargar el archivo .env. Usando variables de entorno del sistema. Error: %v\n", err)
+	} else {
+		fmt.Println("✅ Archivo .env cargado exitosamente.")
+	}
 	cfg := Config{
 		AppEnv:      getEnv("APP_ENV", "development"),
 		HTTPAddr:    getEnv("HTTP_ADDR", ":8080"),
