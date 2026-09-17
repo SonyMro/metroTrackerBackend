@@ -8,10 +8,8 @@ import (
 )
 
 type Config struct {
-	URL string
-
+	URL      string
 	MaxConns int32
-
 	MinConns int32
 }
 

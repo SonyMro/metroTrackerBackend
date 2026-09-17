@@ -68,8 +68,5 @@ func (uc *CreateUser) Execute(
 
 	user.EsActivo = true
 
-	return uc.repository.Crete(
-		ctx,
-		user,
-	)
+	return uc.repository.Create(ctx, user)
 }

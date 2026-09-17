@@ -83,7 +83,7 @@ func (r *UserRepository) Create(
 	return user, nil
 }
 
-func (r *UserRepository) GetByID(
+func (r *UserRepository) GetById(
 	ctx context.Context,
 	id int32,
 ) (*domain.User, error) {
@@ -314,6 +314,43 @@ func (r *UserRepository) Deactivate(
 		ctx,
 		query,
 		id,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	if result.RowsAffected() == 0 {
+		return domain.ErrUserNotFound
+	}
+
+	return nil
+}
+func (r *UserRepository) Update(
+	ctx context.Context,
+	user *domain.User,
+) error {
+	query := `
+		UPDATE usuario
+		SET
+			nombre = $1,
+			apepat = $2,
+			apemat = $3,
+			idrol = $4,
+			idgenero = $5,
+			fehcaact = NOW()
+		WHERE id = $6
+	`
+
+	result, err := r.db.Exec(
+		ctx,
+		query,
+		user.Nombre,
+		user.Apepat,
+		user.Apemat,
+		user.IDRol,
+		user.IDGenero,
+		user.ID,
 	)
 
 	if err != nil {

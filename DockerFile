@@ -1,0 +1,29 @@
+FROM golang:1.25-alpine AS builder
+
+WORKDIR /src
+
+COPY go.mod ./
+
+RUN go mod download
+
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -trimpath \
+    -ldflags="-s -w" \
+    -o /app/backend \
+    ./cmd/api
+
+FROM alpine:3.22
+
+RUN adduser -D -H appuser
+
+WORKDIR /app
+
+COPY --from=builder /app/backend ./backend
+
+USER appuser
+
+EXPOSE 8080
+
+ENTRYPOINT ["./backend"]
