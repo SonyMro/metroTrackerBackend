@@ -19,20 +19,14 @@ type Config struct {
 }
 
 func Load() (Config, error) {
-	// Load local development values without overriding variables from the shell.
-	// A missing .env is valid in production, where the environment is injected externally.
-	err := godotenv.Load()
-	if err != nil {
-		// Es útil manejar el error por si el archivo no existe.
-		// En desarrollo, podrías querer advertir al usuario.
-		fmt.Printf("⚠️ Advertencia: No se pudo cargar el archivo .env. Usando variables de entorno del sistema. Error: %v\n", err)
-	} else {
-		fmt.Println("✅ Archivo .env cargado exitosamente.")
+	// El entorno tiene precedencia; un .env ausente es normal fuera de desarrollo.
+	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return Config{}, fmt.Errorf("cargar .env: %w", err)
 	}
 	cfg := Config{
 		AppEnv:      getEnv("APP_ENV", "development"),
 		HTTPAddr:    getEnv("HTTP_ADDR", ":8080"),
-		DatabaseURL: os.Getenv("DATABASE_URL"),
+		DatabaseURL: "postgres://user_metry:erw34$23Ert@localhost:5432/dbmetry?sslmode=disable", //os.Getenv("DATABASE_URL"),
 		RedisURL:    getEnv("REDIS_URL", "redis://localhost:6379/0"),
 		DBMaxConns:  getEnvInt32("DB_MAX_CONNS", 20),
 		DBMinConns:  getEnvInt32("DB_MIN_CONNS", 2),

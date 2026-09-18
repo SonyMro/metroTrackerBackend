@@ -130,6 +130,7 @@ func main() {
 	router.Get(
 		"/health",
 		func(w http.ResponseWriter, r *http.Request) {
+			// Liveness: confirma que el proceso HTTP sigue atendiendo solicitudes.
 			httpx.WriteJSON(
 				w,
 				http.StatusOK,
@@ -143,6 +144,7 @@ func main() {
 	router.Get(
 		"/health/ready",
 		func(w http.ResponseWriter, r *http.Request) {
+			// Readiness exige que las dependencias requeridas estén disponibles.
 			if err := dbPool.Ping(
 				r.Context(),
 			); err != nil {
@@ -242,6 +244,7 @@ func main() {
 		)
 	}
 
+	// El límite permite terminar solicitudes en curso sin bloquear el cierre indefinidamente.
 	shutdownCtx, cancel := context.WithTimeout(
 		context.Background(),
 		10*time.Second,

@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"fmt"
 
 	"metry.uk/provext4/MetroTrackerBackend/internal/users/domain"
 )
@@ -26,8 +27,9 @@ func (uc *GetUser) Execute(
 		return nil, domain.ErrUserNotFound
 	}
 
-	return uc.repository.GetById(
-		ctx,
-		id,
-	)
+	user, err := uc.repository.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("obtener usuario: %w", err)
+	}
+	return user, nil
 }

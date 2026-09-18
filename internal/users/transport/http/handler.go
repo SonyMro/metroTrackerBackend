@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -344,7 +345,16 @@ func decodeJSON(
 
 	decoder.DisallowUnknownFields()
 
-	return decoder.Decode(target)
+	if err := decoder.Decode(target); err != nil {
+		return err
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New("request body contains multiple JSON values")
+		}
+		return err
+	}
+	return nil
 }
 
 func pathID(
@@ -364,7 +374,9 @@ func pathID(
 	if err != nil {
 		return 0, err
 	}
-
+	if value <= 0 {
+		return 0, errors.New("user ID must be positive")
+	}
 	return int32(value), nil
 }
 

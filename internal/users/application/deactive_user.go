@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"fmt"
 
 	"metry.uk/provext4/MetroTrackerBackend/internal/users/domain"
 )
@@ -26,8 +27,8 @@ func (uc *DeactivateUser) Execute(
 		return domain.ErrUserNotFound
 	}
 
-	return uc.repository.Deactivate(
-		ctx,
-		id,
-	)
+	if err := uc.repository.Deactivate(ctx, id); err != nil {
+		return fmt.Errorf("desactivar usuario: %w", err)
+	}
+	return nil
 }

@@ -2,7 +2,7 @@ package application
 
 import (
 	"context"
-	"strings"
+	"fmt"
 
 	"metry.uk/provext4/MetroTrackerBackend/internal/users/domain"
 )
@@ -28,18 +28,19 @@ func (uc *UpdateUser) Execute(
 	idRol int32,
 	idGenero int32,
 ) error {
-	user, err := uc.repository.GetById(
-		ctx,
-		id,
-	)
+	if id <= 0 || idRol <= 0 || idGenero <= 0 {
+		return domain.ErrInvalidUser
+	}
+	user, err := uc.repository.GetByID(ctx, id)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("obtener usuario para actualizar: %w", err)
 	}
 
-	user.Nombre = strings.TrimSpace(nombre)
-	user.Apepat = strings.TrimSpace(apepat)
-	user.Apemat = strings.TrimSpace(apemat)
+	user.Nombre = nombre
+	user.Apepat = apepat
+	user.Apemat = apemat
+	normalizeNames(user)
 	user.IDRol = idRol
 	user.IDGenero = idGenero
 
@@ -48,12 +49,8 @@ func (uc *UpdateUser) Execute(
 		return domain.ErrInvalidUser
 	}
 
-	if idRol <= 0 || idGenero <= 0 {
-		return domain.ErrInvalidUser
+	if err := uc.repository.Update(ctx, user); err != nil {
+		return fmt.Errorf("actualizar usuario: %w", err)
 	}
-
-	return uc.repository.Update(
-		ctx,
-		user,
-	)
+	return nil
 }

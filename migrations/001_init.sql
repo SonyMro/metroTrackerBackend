@@ -16,17 +16,24 @@ CREATE TABLE genero (
     descripcion VARCHAR(255)
 );
 
+-- Tabla: roles
+CREATE TABLE roles (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL UNIQUE
+);
+
 -- Tabla: usuario
 CREATE TABLE usuario (
     id SERIAL PRIMARY KEY,
     nombre VARCHAR(100) UNIQUE NOT NULL,
-    apermat VARCHAR(100),
+    apepat VARCHAR(100) NOT NULL,
+    apemat VARCHAR(100),
     foto BYTEA,
     correo VARCHAR(50) UNIQUE,
     password VARCHAR(70),
     fecharegistro TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     fechaact TIMESTAMP WITH TIME ZONE,
-    idrol INTEGER, -- Referencia a un rol (si existe una tabla de roles)
+    idrol INTEGER REFERENCES roles(id),
     idgenero INTEGER REFERENCES genero(id),
     esactivo BOOLEAN DEFAULT TRUE
 );

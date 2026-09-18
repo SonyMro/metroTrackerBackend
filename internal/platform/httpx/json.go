@@ -29,6 +29,7 @@ func WriteError(
 	status int,
 	message string,
 ) {
+	// Conserva el contrato de errores JSON: {"error": "..."}.
 	WriteJSON(
 		w,
 		status,

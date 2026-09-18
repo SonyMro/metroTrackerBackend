@@ -1,18 +1,5 @@
 # Migraciones
 
-La migración `001_init.sql` crea:
+`001_init.sql` crea el esquema para instalaciones nuevas, incluidas las tablas `roles`, `genero` y `usuario` con las columnas `apepat`, `apemat` y `fechaact`.
 
-- roles
-- genero
-- usuario
-
-También habilita PostGIS.
-
-La columna `fehcaact` conserva el nombre original
-del diagrama proporcionado.
-
-Si se desea corregir el nombre:
-
-```sql
-ALTER TABLE usuario
-RENAME COLUMN fehcaact TO fechaact;
+`002_align_user_schema.sql` actualiza de forma idempotente instalaciones previas: conserva datos al renombrar columnas históricas y agrega las columnas o relación faltantes.

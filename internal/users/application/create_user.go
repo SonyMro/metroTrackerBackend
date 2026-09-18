@@ -2,6 +2,8 @@ package application
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
@@ -24,16 +26,14 @@ func (uc *CreateUser) Execute(
 	ctx context.Context,
 	user *domain.User,
 ) (*domain.User, error) {
-	user.Nombre = strings.TrimSpace(user.Nombre)
-	user.Apepat = strings.TrimSpace(user.Apepat)
-	user.Apemat = strings.TrimSpace(user.Apemat)
+	normalizeNames(user)
 	user.Correo = strings.ToLower(
 		strings.TrimSpace(user.Correo),
 	)
 
 	if user.Nombre == "" ||
 		user.Apepat == "" ||
-		user.Correo == "" {
+		user.Correo == "" || user.IDRol <= 0 || user.IDGenero <= 0 {
 		return nil, domain.ErrInvalidUser
 	}
 
@@ -46,9 +46,8 @@ func (uc *CreateUser) Execute(
 		user.Correo,
 	)
 
-	if err != nil &&
-		err != domain.ErrUserNotFound {
-		return nil, err
+	if err != nil && !errors.Is(err, domain.ErrUserNotFound) {
+		return nil, fmt.Errorf("consultar usuario por correo: %w", err)
 	}
 
 	if existing != nil {
@@ -61,12 +60,22 @@ func (uc *CreateUser) Execute(
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("hashear contraseña: %w", err)
 	}
 
 	user.Password = string(hashedPassword)
 
 	user.EsActivo = true
 
-	return uc.repository.Create(ctx, user)
+	created, err := uc.repository.Create(ctx, user)
+	if err != nil {
+		return nil, fmt.Errorf("crear usuario: %w", err)
+	}
+	return created, nil
+}
+
+func normalizeNames(user *domain.User) {
+	user.Nombre = strings.TrimSpace(user.Nombre)
+	user.Apepat = strings.TrimSpace(user.Apepat)
+	user.Apemat = strings.TrimSpace(user.Apemat)
 }
