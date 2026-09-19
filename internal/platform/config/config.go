@@ -9,6 +9,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// Config reúne la configuración de la aplicación y de sus servicios externos.
 type Config struct {
 	AppEnv      string
 	HTTPAddr    string
@@ -19,10 +20,11 @@ type Config struct {
 }
 
 func Load() (Config, error) {
-	// El entorno tiene precedencia; un .env ausente es normal fuera de desarrollo.
+	// .env es opcional; sus valores se cargan antes de consultar el entorno, que tiene precedencia.
 	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return Config{}, fmt.Errorf("cargar .env: %w", err)
 	}
+	// Los helpers aplican valores por defecto; la URL actual de PostgreSQL permanece definida en el código.
 	cfg := Config{
 		AppEnv:      getEnv("APP_ENV", "development"),
 		HTTPAddr:    getEnv("HTTP_ADDR", ":8080"),
@@ -31,6 +33,7 @@ func Load() (Config, error) {
 		DBMaxConns:  getEnvInt32("DB_MAX_CONNS", 20),
 		DBMinConns:  getEnvInt32("DB_MIN_CONNS", 2),
 	}
+	// Se validan la conexión de PostgreSQL y los límites permitidos del pool.
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
 	}
@@ -49,6 +52,7 @@ func Load() (Config, error) {
 
 }
 
+// getEnv devuelve el valor del entorno o fallback cuando la variable está vacía.
 func getEnv(key, fallback string) string {
 
 	value := os.Getenv(key)
@@ -59,6 +63,7 @@ func getEnv(key, fallback string) string {
 
 }
 
+// getEnvInt32 devuelve el entero del entorno o fallback si está vacío o no se puede convertir.
 func getEnvInt32(key string, fallback int32) int32 {
 
 	value := os.Getenv(key)

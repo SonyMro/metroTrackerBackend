@@ -23,7 +23,9 @@ import (
 	userhttp "metry.uk/provext4/MetroTrackerBackend/internal/users/transport/http"
 )
 
+// main inicia la aplicación, conecta sus dependencias y levanta el servidor HTTP.
 func main() {
+	// La configuración se carga antes de componer las dependencias del proceso.
 	cfg, err := config.Load()
 
 	if err != nil {
@@ -32,6 +34,7 @@ func main() {
 
 	ctx := context.Background()
 
+	// PostgreSQL se inicializa con los límites del pool y se libera al cerrar la aplicación.
 	dbPool, err := database.NewPostgres(
 		ctx,
 		database.Config{
@@ -50,6 +53,7 @@ func main() {
 
 	defer dbPool.Close()
 
+	// Redis se crea y se comprueba antes de exponer las rutas que dependen de él.
 	redisClient, err := redisplatform.NewClient(
 		cfg.RedisURL,
 	)
@@ -73,6 +77,7 @@ func main() {
 		)
 	}
 
+	// Estas capas conectan la persistencia con los casos de uso y el handler HTTP de usuarios.
 	userRepository := userpostgres.NewUserRepository(
 		dbPool,
 	)
@@ -107,6 +112,7 @@ func main() {
 
 	router := chi.NewRouter()
 
+	// Los middlewares añaden identificación, dirección real, registro, recuperación y límite de tiempo.
 	router.Use(
 		middleware.RequestID,
 	)
@@ -183,6 +189,7 @@ func main() {
 	router.Route(
 		"/api/v1",
 		func(r chi.Router) {
+			// Las rutas versionadas de usuarios se montan bajo el handler de transporte.
 			r.Mount(
 				"/users",
 				userHandler.Routes(),
@@ -190,6 +197,7 @@ func main() {
 		},
 	)
 
+	// Estos límites protegen la lectura, escritura y permanencia de conexiones HTTP.
 	server := &http.Server{
 		Addr: cfg.HTTPAddr,
 
@@ -209,6 +217,7 @@ func main() {
 		1,
 	)
 
+	// El servidor arranca en segundo plano para poder atender errores y señales de apagado.
 	go func() {
 		log.Printf(
 			"HTTP server listening on %s",
@@ -226,6 +235,7 @@ func main() {
 
 	defer stop()
 
+	// Se espera el cierre del servidor o una señal del sistema para iniciar un apagado ordenado.
 	select {
 	case err := <-serverErrors:
 		if !errors.Is(
