@@ -16,6 +16,11 @@ type fakeUserRepository struct {
 	count      func(context.Context) (int, error)
 }
 
+// ListGeneros implements [domain.UserRepository].
+func (f fakeUserRepository) ListGeneros(ctx context.Context) ([]*domain.Genero, error) {
+	panic("unimplemented")
+}
+
 func (f fakeUserRepository) Create(ctx context.Context, user *domain.User) (*domain.User, error) {
 	return f.create(ctx, user)
 }
