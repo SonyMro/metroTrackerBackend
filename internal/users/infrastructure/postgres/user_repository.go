@@ -40,6 +40,11 @@ func scanListUser(row pgx.Row) (*domain.User, error) {
 	err := row.Scan(&user.ID, &user.Nombre, &user.Apepat, &user.Apemat, &user.Correo, &user.FechaRegistro, &user.FechaAct, &user.IDRol, &user.IDGenero, &user.EsActivo, &user.Rol.ID, &user.Rol.Nombre, &user.Genero.ID, &user.Genero.Tipo)
 	return user, err
 }
+func scanListGender(row pgx.Row) (*domain.Genero, error) {
+	genero := &domain.Genero{}
+	err := row.Scan(&genero.ID, &genero.Tipo)
+	return genero, err
+}
 
 func (r *UserRepository) GetByID(ctx context.Context, id int32) (*domain.User, error) {
 	user, err := scanUser(r.db.QueryRow(ctx, `SELECT `+userDetailColumns+userJoins+` WHERE u.id = $1`, id))
@@ -113,4 +118,26 @@ func (r *UserRepository) Update(ctx context.Context, user *domain.User) error {
 		return domain.ErrUserNotFound
 	}
 	return nil
+}
+
+func (r *UserRepository) ListGeneros(ctx context.Context) ([]*domain.Genero, error) {
+	rows, err := r.db.Query(ctx, `select id, Tipo from genero`)
+	if err != nil {
+		return nil, fmt.Errorf("consultar lista de usuarios: %w", err)
+	}
+	defer rows.Close()
+	generos := make([]*domain.Genero, 0)
+	for rows.Next() {
+		genero, err := scanListGender(rows)
+		if err != nil {
+			return nil, fmt.Errorf("leer roles listado: %w", err)
+		}
+		generos = append(generos, genero)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterrar lista de generos: %w", err)
+
+	}
+	return generos, nil
+
 }

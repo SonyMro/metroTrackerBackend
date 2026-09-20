@@ -11,7 +11,7 @@ import (
 )
 
 func TestHandlerRejectsInvalidJSONAndID(t *testing.T) {
-	handler := NewHandler(nil, nil, nil, nil, nil)
+	handler := NewHandler(nil, nil, nil, nil, nil, nil)
 	tests := []struct{ name, method, target, body string }{
 		{"campo desconocido", http.MethodPost, "/", `{"nombre":"Ana","extra":true}`},
 		{"objetos concatenados", http.MethodPost, "/", `{} {}`},

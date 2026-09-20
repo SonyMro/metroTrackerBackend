@@ -19,6 +19,7 @@ type Handler struct {
 	listUsers      *application.ListUsers
 	updateUser     *application.UpdateUser
 	deactivateUser *application.DeactivateUser
+	listaGeneros   *application.ListGenders
 }
 
 func NewHandler(
@@ -27,6 +28,7 @@ func NewHandler(
 	listUsers *application.ListUsers,
 	updateUser *application.UpdateUser,
 	deactivateUser *application.DeactivateUser,
+	listGenders *application.ListGenders,
 ) *Handler {
 	return &Handler{
 		createUser:     createUser,
@@ -34,6 +36,7 @@ func NewHandler(
 		listUsers:      listUsers,
 		updateUser:     updateUser,
 		deactivateUser: deactivateUser,
+		listaGeneros:   listGenders,
 	}
 }
 
@@ -50,6 +53,7 @@ func (h *Handler) Routes() chi.Router {
 
 	r.Delete("/{id}", h.deactivate)
 
+	r.Get("/genders", h.listGenders)
 	return r
 }
 
@@ -280,7 +284,23 @@ func (h *Handler) deactivate(
 		http.StatusNoContent,
 	)
 }
+func (h *Handler) listGenders(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 
+	result, err := h.listaGeneros.Execute(
+		r.Context(),
+	)
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
+
+	httpx.WriteJSON(
+		w, http.StatusOK, result,
+	)
+}
 func (h *Handler) writeDomainError(
 	w http.ResponseWriter,
 	err error,

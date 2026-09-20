@@ -10,4 +10,5 @@ type UserRepository interface {
 	Count(ctx context.Context) (int, error)
 	Update(ctx context.Context, user *User) error
 	Deactivate(ctx context.Context, id int32) error
+	ListGeneros(ctx context.Context) ([]*Genero, error)
 }

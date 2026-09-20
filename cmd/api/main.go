@@ -102,12 +102,16 @@ func main() {
 		userRepository,
 	)
 
+	listGenders := userapplication.NewListGenders(
+		userRepository,
+	)
 	userHandler := userhttp.NewHandler(
 		createUser,
 		getUser,
 		listUsers,
 		updateUser,
 		deactivateUser,
+		listGenders,
 	)
 
 	router := chi.NewRouter()
