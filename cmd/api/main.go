@@ -21,6 +21,10 @@ import (
 	userapplication "metry.uk/provext4/MetroTrackerBackend/internal/users/application"
 	userpostgres "metry.uk/provext4/MetroTrackerBackend/internal/users/infrastructure/postgres"
 	userhttp "metry.uk/provext4/MetroTrackerBackend/internal/users/transport/http"
+
+	mapaaplication "metry.uk/provext4/MetroTrackerBackend/internal/metroMap/application"
+	mapapostgres "metry.uk/provext4/MetroTrackerBackend/internal/metroMap/infrastructure/postgres"
+	mapashttp "metry.uk/provext4/MetroTrackerBackend/internal/metroMap/trasport/http"
 )
 
 // main inicia la aplicación, conecta sus dependencias y levanta el servidor HTTP.
@@ -114,6 +118,18 @@ func main() {
 		listGenders,
 	)
 
+	mapaRepository := mapapostgres.NewMapaRepository(
+		dbPool,
+	)
+
+	listPointsMap := mapaaplication.NewListPoint(
+		mapaRepository,
+	)
+
+	mapasHandler := mapashttp.NewHandler(
+		listPointsMap,
+	)
+
 	router := chi.NewRouter()
 
 	// Los middlewares añaden identificación, dirección real, registro, recuperación y límite de tiempo.
@@ -198,6 +214,7 @@ func main() {
 				"/users",
 				userHandler.Routes(),
 			)
+			r.Mount("/maps", mapasHandler.Routes())
 		},
 	)
 
