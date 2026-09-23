@@ -24,6 +24,7 @@ import (
 
 	mapaaplication "metry.uk/provext4/MetroTrackerBackend/internal/metroMap/application"
 	mapapostgres "metry.uk/provext4/MetroTrackerBackend/internal/metroMap/infrastructure/postgres"
+	maparedis "metry.uk/provext4/MetroTrackerBackend/internal/metroMap/infrastructure/redis"
 	mapashttp "metry.uk/provext4/MetroTrackerBackend/internal/metroMap/trasport/http"
 )
 
@@ -122,8 +123,13 @@ func main() {
 		dbPool,
 	)
 
-	listPointsMap := mapaaplication.NewListPoint(
+	mapaRepositoryWithCache := maparedis.NewMapaCacheRepository(
 		mapaRepository,
+		redisClient,
+	)
+
+	listPointsMap := mapaaplication.NewListPoint(
+		mapaRepositoryWithCache,
 	)
 
 	mapasHandler := mapashttp.NewHandler(

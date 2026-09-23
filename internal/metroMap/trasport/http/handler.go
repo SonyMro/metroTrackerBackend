@@ -40,6 +40,7 @@ func (h *Handler) getDatosMapa(
 	)
 	if err != nil {
 		h.writeDomainError(w, err)
+		return
 	}
 
 	httpx.WriteJSON(
