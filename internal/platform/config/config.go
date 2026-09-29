@@ -36,7 +36,6 @@ func Load() (Config, error) {
 		DBMinConns:  getEnvInt32("DB_MIN_CONNS", 2),
 	}
 	log.Println("El ambiente es:", cfg.AppEnv)
-	log.Println("La URL de la base de datos es:", cfg.DatabaseURL)
 	// Se validan la conexión de PostgreSQL y los límites permitidos del pool.
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
