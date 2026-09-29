@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 
@@ -20,19 +21,22 @@ type Config struct {
 }
 
 func Load() (Config, error) {
+
 	// .env es opcional; sus valores se cargan antes de consultar el entorno, que tiene precedencia.
-	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
+	if err := godotenv.Load("env/.env.development", "env/.env"); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return Config{}, fmt.Errorf("cargar .env: %w", err)
 	}
 	// Los helpers aplican valores por defecto; la URL actual de PostgreSQL permanece definida en el código.
 	cfg := Config{
 		AppEnv:      getEnv("APP_ENV", "development"),
 		HTTPAddr:    getEnv("HTTP_ADDR", ":8080"),
-		DatabaseURL: "postgres://user_metry:erw34$23Ert@localhost:5432/dbmetry?sslmode=disable", //os.Getenv("DATABASE_URL"),
+		DatabaseURL: os.Getenv("DATABASE_URL"),
 		RedisURL:    getEnv("REDIS_URL", "redis://localhost:6379/0"),
 		DBMaxConns:  getEnvInt32("DB_MAX_CONNS", 20),
 		DBMinConns:  getEnvInt32("DB_MIN_CONNS", 2),
 	}
+	log.Println("El ambiente es:", cfg.AppEnv)
+	log.Println("La URL de la base de datos es:", cfg.DatabaseURL)
 	// Se validan la conexión de PostgreSQL y los límites permitidos del pool.
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")

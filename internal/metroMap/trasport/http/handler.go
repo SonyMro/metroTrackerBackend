@@ -10,10 +10,12 @@ import (
 	"metry.uk/provext4/MetroTrackerBackend/internal/platform/httpx"
 )
 
+// Handler expone los casos de uso del mapa mediante endpoints HTTP.
 type Handler struct {
 	ListPoints *application.ListPoint
 }
 
+// NewHandler crea el handler del mapa con el caso de uso para listar puntos.
 func NewHandler(
 	ListPoints *application.ListPoint,
 ) *Handler {
@@ -22,6 +24,7 @@ func NewHandler(
 	}
 }
 
+// Routes registra las rutas HTTP disponibles para el mapa.
 func (h *Handler) Routes() chi.Router {
 
 	r := chi.NewRouter()

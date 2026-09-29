@@ -23,7 +23,7 @@ func (r *MapaRepository) GetPoints(ctx context.Context) ([]*domain.PuntoMap, err
 	rows, err := r.db.Query(ctx, `SELECT l.nombre AS linea, e.nombre AS estacion, e.habilitada, e.longitud, e.latitud, l.color  FROM estacion AS e
 		INNER JOIN  estacionlinea AS el ON el.idestacion = e.id
 		INNER JOIN linea AS l ON l.id= el.idlinea
-		ORDER BY l.numero, e.numero;`)
+		ORDER BY l.numero, el.numero;`)
 
 	if err != nil {
 		return nil, fmt.Errorf("consultar lista usuarios: %w", err)
