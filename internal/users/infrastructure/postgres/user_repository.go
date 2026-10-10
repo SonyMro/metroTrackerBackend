@@ -34,12 +34,10 @@ func (r *UserRepository) ResolveGoogleIdentity(ctx context.Context, claims domai
 	}
 	defer tx.Rollback(ctx)
 
-	const linkedQuery = `SELECT ` + userDetailColumns + userJoins + ` JOIN user_auth a ON a.user_id = u.id WHERE a.provider = 'google' AND a.provider_id = $1 FOR UPDATE OF u`
-	fmt.Println("linkedQuery:", linkedQuery)
-	user, err := scanUser(tx.QueryRow(ctx, linkedQuery, claims.Subject))
+	user, err := r.resolveGoogleLinkedUser(ctx, tx, claims)
 	if err == nil {
-		if err := tx.Commit(ctx); err != nil {
-			return nil, fmt.Errorf("confirmar identidad Google: %w", err)
+		if err := finalizeGoogleTransaction(ctx, tx, "confirmar identidad Google"); err != nil {
+			return nil, err
 		}
 		return user, nil
 	}
@@ -47,18 +45,10 @@ func (r *UserRepository) ResolveGoogleIdentity(ctx context.Context, claims domai
 		return nil, fmt.Errorf("buscar vínculo Google: %w", err)
 	}
 
-	const emailQuery = `SELECT ` + userDetailColumns + userJoins + ` WHERE u.correo = $1 FOR UPDATE OF u`
-	fmt.Println("emailQuery:", emailQuery)
-	user, err = scanUser(tx.QueryRow(ctx, emailQuery, claims.Email))
+	user, err = r.resolveGoogleIdentityByEmail(ctx, tx, claims)
 	if err == nil {
-		if _, err := tx.Exec(ctx, `UPDATE usuario SET google_id = $1, fechaact = NOW() WHERE id = $2`, claims.Subject, user.ID); err != nil {
-			return nil, fmt.Errorf("guardar vínculo Google en usuario: %w", err)
-		}
-		if _, err := tx.Exec(ctx, `INSERT INTO user_auth (user_id, provider, provider_id) VALUES ($1, 'google', $2)`, user.ID, claims.Subject); err != nil {
-			return nil, googleLinkError(err)
-		}
-		if err := tx.Commit(ctx); err != nil {
-			return nil, fmt.Errorf("confirmar vínculo Google: %w", err)
+		if err := finalizeGoogleTransaction(ctx, tx, "confirmar vínculo Google"); err != nil {
+			return nil, err
 		}
 		return user, nil
 	}
@@ -66,6 +56,44 @@ func (r *UserRepository) ResolveGoogleIdentity(ctx context.Context, claims domai
 		return nil, fmt.Errorf("buscar usuario por correo en transacción: %w", err)
 	}
 
+	user, err = r.createGoogleUser(ctx, tx, claims, defaultRoleID, defaultGenderID)
+	if err != nil {
+		return nil, err
+	}
+	if err := finalizeGoogleTransaction(ctx, tx, "confirmar alta Google"); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func finalizeGoogleTransaction(ctx context.Context, tx pgx.Tx, action string) error {
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("%s: %w", action, err)
+	}
+	return nil
+}
+
+func (r *UserRepository) resolveGoogleLinkedUser(ctx context.Context, tx pgx.Tx, claims domain.GoogleClaims) (*domain.User, error) {
+	const linkedQuery = `SELECT ` + userDetailColumns + userJoins + ` JOIN user_auth a ON a.user_id = u.id WHERE a.provider = 'google' AND a.provider_id = $1 FOR UPDATE OF u`
+	return scanUser(tx.QueryRow(ctx, linkedQuery, claims.Subject))
+}
+
+func (r *UserRepository) resolveGoogleIdentityByEmail(ctx context.Context, tx pgx.Tx, claims domain.GoogleClaims) (*domain.User, error) {
+	const emailQuery = `SELECT ` + userDetailColumns + userJoins + ` WHERE u.correo = $1 FOR UPDATE OF u`
+	user, err := scanUser(tx.QueryRow(ctx, emailQuery, claims.Email))
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE usuario SET google_id = $1, fechaact = NOW() WHERE id = $2`, claims.Subject, user.ID); err != nil {
+		return nil, fmt.Errorf("guardar vínculo Google en usuario: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO user_auth (user_id, provider, provider_id) VALUES ($1, 'google', $2)`, user.ID, claims.Subject); err != nil {
+		return nil, googleLinkError(err)
+	}
+	return user, nil
+}
+
+func (r *UserRepository) createGoogleUser(ctx context.Context, tx pgx.Tx, claims domain.GoogleClaims, defaultRoleID, defaultGenderID int32) (*domain.User, error) {
 	name := claims.Name
 	if name == "" {
 		name = claims.Email
@@ -78,12 +106,9 @@ func (r *UserRepository) ResolveGoogleIdentity(ctx context.Context, claims domai
 	if _, err := tx.Exec(ctx, `INSERT INTO user_auth (user_id, provider, provider_id) VALUES ($1, 'google', $2)`, userID, claims.Subject); err != nil {
 		return nil, googleLinkError(err)
 	}
-	user, err = scanUser(tx.QueryRow(ctx, `SELECT `+userDetailColumns+userJoins+` WHERE u.id = $1`, userID))
+	user, err := scanUser(tx.QueryRow(ctx, `SELECT `+userDetailColumns+userJoins+` WHERE u.id = $1`, userID))
 	if err != nil {
 		return nil, fmt.Errorf("recuperar usuario Google: %w", err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("confirmar alta Google: %w", err)
 	}
 	return user, nil
 }
