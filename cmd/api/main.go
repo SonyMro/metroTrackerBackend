@@ -19,6 +19,8 @@ import (
 	redisplatform "metry.uk/provext4/MetroTrackerBackend/internal/platform/redis"
 
 	userapplication "metry.uk/provext4/MetroTrackerBackend/internal/users/application"
+	usergoogle "metry.uk/provext4/MetroTrackerBackend/internal/users/infrastructure/google"
+	userjwt "metry.uk/provext4/MetroTrackerBackend/internal/users/infrastructure/jwt"
 	userpostgres "metry.uk/provext4/MetroTrackerBackend/internal/users/infrastructure/postgres"
 	userhttp "metry.uk/provext4/MetroTrackerBackend/internal/users/transport/http"
 
@@ -110,6 +112,21 @@ func main() {
 	listGenders := userapplication.NewListGenders(
 		userRepository,
 	)
+	googleVerifier, err := usergoogle.NewIDTokenVerifier(cfg.GoogleClientID)
+	if err != nil {
+		log.Fatalf("Google verifier configuration error: %v", err)
+	}
+	jwtIssuer, err := userjwt.NewIssuer(cfg.JWTSecret, cfg.JWTExpiration)
+	if err != nil {
+		log.Fatalf("JWT issuer configuration error: %v", err)
+	}
+	googleLogin := userapplication.NewGoogleLogin(
+		googleVerifier,
+		userRepository,
+		jwtIssuer,
+		cfg.DefaultRoleID,
+		cfg.DefaultGenderID,
+	)
 	userHandler := userhttp.NewHandler(
 		createUser,
 		getUser,
@@ -117,6 +134,7 @@ func main() {
 		updateUser,
 		deactivateUser,
 		listGenders,
+		googleLogin,
 	)
 
 	mapaRepository := mapapostgres.NewMapaRepository(

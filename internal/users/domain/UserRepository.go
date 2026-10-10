@@ -12,3 +12,23 @@ type UserRepository interface {
 	Deactivate(ctx context.Context, id int32) error
 	ListGeneros(ctx context.Context) ([]*Genero, error)
 }
+
+// GoogleClaims contiene únicamente los datos de identidad que requiere el caso de uso.
+type GoogleClaims struct {
+	Subject string
+	Email   string
+	Name    string
+}
+
+type GoogleTokenVerifier interface {
+	Verify(ctx context.Context, rawToken string) (GoogleClaims, error)
+}
+
+type TokenIssuer interface {
+	Issue(user *User) (string, error)
+}
+
+// GoogleIdentityRepository resuelve y crea vínculos Google dentro de una transacción.
+type GoogleIdentityRepository interface {
+	ResolveGoogleIdentity(ctx context.Context, claims GoogleClaims, defaultRoleID, defaultGenderID int32) (*User, error)
+}

@@ -9,6 +9,7 @@ type User struct {
 	Apemat        string
 	Foto          []byte
 	Correo        string
+	GoogleID      string
 	Password      string
 	FechaRegistro time.Time
 	FechaAct      time.Time

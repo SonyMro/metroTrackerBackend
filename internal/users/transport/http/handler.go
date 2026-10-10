@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -20,6 +21,11 @@ type Handler struct {
 	updateUser     *application.UpdateUser
 	deactivateUser *application.DeactivateUser
 	listaGeneros   *application.ListGenders
+	googleLogin    GoogleLoginUseCase
+}
+
+type GoogleLoginUseCase interface {
+	Execute(context.Context, string) (*application.GoogleLoginResult, error)
 }
 
 func NewHandler(
@@ -29,7 +35,12 @@ func NewHandler(
 	updateUser *application.UpdateUser,
 	deactivateUser *application.DeactivateUser,
 	listGenders *application.ListGenders,
+	googleLogin ...GoogleLoginUseCase,
 ) *Handler {
+	var login GoogleLoginUseCase
+	if len(googleLogin) > 0 {
+		login = googleLogin[0]
+	}
 	return &Handler{
 		createUser:     createUser,
 		getUser:        getUser,
@@ -37,6 +48,7 @@ func NewHandler(
 		updateUser:     updateUser,
 		deactivateUser: deactivateUser,
 		listaGeneros:   listGenders,
+		googleLogin:    login,
 	}
 }
 
@@ -44,6 +56,7 @@ func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
 
 	r.Post("/", h.create)
+	r.Post("/auth/google", h.google)
 
 	r.Get("/", h.list)
 
@@ -55,6 +68,20 @@ func (h *Handler) Routes() chi.Router {
 
 	r.Get("/genders", h.listGenders)
 	return r
+}
+
+func (h *Handler) google(w http.ResponseWriter, r *http.Request) {
+	var request GoogleLoginRequest
+	if err := decodeJSON(r, &request); err != nil || request.IDToken == "" {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	result, err := h.googleLogin.Execute(r.Context(), request.IDToken)
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, GoogleLoginResponse{Token: result.Token, User: toUserResponse(result.User)})
 }
 
 func (h *Handler) create(
@@ -345,6 +372,15 @@ func (h *Handler) writeDomainError(
 			http.StatusBadRequest,
 			"invalid password",
 		)
+
+	case errors.Is(err, domain.ErrInvalidGoogleToken):
+		httpx.WriteError(w, http.StatusUnauthorized, "invalid Google token")
+	case errors.Is(err, domain.ErrInvalidGoogleClaims):
+		httpx.WriteError(w, http.StatusBadRequest, "invalid Google identity")
+	case errors.Is(err, domain.ErrInactiveUser):
+		httpx.WriteError(w, http.StatusForbidden, "user account is inactive")
+	case errors.Is(err, domain.ErrGoogleLinkAlreadyExists):
+		httpx.WriteError(w, http.StatusConflict, "Google account is already linked")
 
 	default:
 		httpx.WriteError(

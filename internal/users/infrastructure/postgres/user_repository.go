@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"metry.uk/provext4/MetroTrackerBackend/internal/users/domain"
 )
@@ -25,7 +26,77 @@ func (r *UserRepository) Create(ctx context.Context, user *domain.User) (*domain
 	return user, nil
 }
 
-const userDetailColumns = `u.id, u.nombre, u.apepat, u.apemat, u.foto, u.correo, u.password, u.fecharegistro, u.fechaact, u.idrol, u.idgenero, u.esactivo, r.id, r.nombre, g.id, g.Tipo`
+// ResolveGoogleIdentity mantiene la búsqueda, vinculación y alta en una sola transacción.
+func (r *UserRepository) ResolveGoogleIdentity(ctx context.Context, claims domain.GoogleClaims, defaultRoleID, defaultGenderID int32) (*domain.User, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("iniciar transacción de identidad Google: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	const linkedQuery = `SELECT ` + userDetailColumns + userJoins + ` JOIN user_auth a ON a.user_id = u.id WHERE a.provider = 'google' AND a.provider_id = $1 FOR UPDATE OF u`
+	fmt.Println("linkedQuery:", linkedQuery)
+	user, err := scanUser(tx.QueryRow(ctx, linkedQuery, claims.Subject))
+	if err == nil {
+		if err := tx.Commit(ctx); err != nil {
+			return nil, fmt.Errorf("confirmar identidad Google: %w", err)
+		}
+		return user, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("buscar vínculo Google: %w", err)
+	}
+
+	const emailQuery = `SELECT ` + userDetailColumns + userJoins + ` WHERE u.correo = $1 FOR UPDATE OF u`
+	fmt.Println("emailQuery:", emailQuery)
+	user, err = scanUser(tx.QueryRow(ctx, emailQuery, claims.Email))
+	if err == nil {
+		if _, err := tx.Exec(ctx, `UPDATE usuario SET google_id = $1, fechaact = NOW() WHERE id = $2`, claims.Subject, user.ID); err != nil {
+			return nil, fmt.Errorf("guardar vínculo Google en usuario: %w", err)
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO user_auth (user_id, provider, provider_id) VALUES ($1, 'google', $2)`, user.ID, claims.Subject); err != nil {
+			return nil, googleLinkError(err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return nil, fmt.Errorf("confirmar vínculo Google: %w", err)
+		}
+		return user, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("buscar usuario por correo en transacción: %w", err)
+	}
+
+	name := claims.Name
+	if name == "" {
+		name = claims.Email
+	}
+	var userID int32
+	const insertUser = `INSERT INTO usuario (nombre, apepat, correo, google_id, fecharegistro, fechaact, idrol, idgenero, esactivo) VALUES ($1, '-', $2, $3, NOW(), NOW(), $4, $5, TRUE) RETURNING id`
+	if err := tx.QueryRow(ctx, insertUser, name, claims.Email, claims.Subject, defaultRoleID, defaultGenderID).Scan(&userID); err != nil {
+		return nil, googleLinkError(err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO user_auth (user_id, provider, provider_id) VALUES ($1, 'google', $2)`, userID, claims.Subject); err != nil {
+		return nil, googleLinkError(err)
+	}
+	user, err = scanUser(tx.QueryRow(ctx, `SELECT `+userDetailColumns+userJoins+` WHERE u.id = $1`, userID))
+	if err != nil {
+		return nil, fmt.Errorf("recuperar usuario Google: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("confirmar alta Google: %w", err)
+	}
+	return user, nil
+}
+
+func googleLinkError(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return fmt.Errorf("%w: %v", domain.ErrGoogleLinkAlreadyExists, err)
+	}
+	return fmt.Errorf("persistir identidad Google: %w", err)
+}
+
+const userDetailColumns = `u.id, u.nombre, u.apepat, COALESCE(u.apemat,''), u.foto, u.correo, COALESCE(u.password, ''), u.fecharegistro, u.fechaact, u.idrol, u.idgenero, u.esactivo, r.id, r.nombre, g.id, g.Tipo`
 const userListColumns = `u.id, u.nombre, u.apepat, u.apemat, u.correo, u.fecharegistro, u.fechaact, u.idrol, u.idgenero, u.esactivo, r.id, r.nombre, g.id, g.Tipo`
 const userJoins = ` FROM usuario u LEFT JOIN roles r ON r.id = u.idrol LEFT JOIN genero g ON g.id = u.idgenero `
 
