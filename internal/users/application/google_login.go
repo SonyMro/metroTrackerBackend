@@ -6,18 +6,19 @@ import (
 	"fmt"
 	"strings"
 
+	authdomain "metry.uk/provext4/MetroTrackerBackend/internal/auth/domain"
 	"metry.uk/provext4/MetroTrackerBackend/internal/users/domain"
 )
 
 type GoogleLogin struct {
 	verifier        domain.GoogleTokenVerifier
 	identities      domain.GoogleIdentityRepository
-	issuer          domain.TokenIssuer
+	issuer          authdomain.SessionStore
 	defaultRoleID   int32
 	defaultGenderID int32
 }
 
-func NewGoogleLogin(verifier domain.GoogleTokenVerifier, identities domain.GoogleIdentityRepository, issuer domain.TokenIssuer, defaultRoleID, defaultGenderID int32) *GoogleLogin {
+func NewGoogleLogin(verifier domain.GoogleTokenVerifier, identities domain.GoogleIdentityRepository, issuer authdomain.SessionStore, defaultRoleID, defaultGenderID int32) *GoogleLogin {
 	return &GoogleLogin{verifier: verifier, identities: identities, issuer: issuer, defaultRoleID: defaultRoleID, defaultGenderID: defaultGenderID}
 }
 
@@ -50,7 +51,7 @@ func (uc *GoogleLogin) Execute(ctx context.Context, rawToken string) (*GoogleLog
 	if user == nil || !user.EsActivo {
 		return nil, domain.ErrInactiveUser
 	}
-	token, err := uc.issuer.Issue(user)
+	token, err := uc.issuer.Issue(ctx, authdomain.Identity{UserID: user.ID, RoleID: user.IDRol})
 	if err != nil {
 		return nil, fmt.Errorf("emitir token de aplicación: %w", err)
 	}

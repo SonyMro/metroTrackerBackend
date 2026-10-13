@@ -1,6 +1,8 @@
 package domain
 
-import "context"
+import (
+	"context"
+)
 
 type UserRepository interface {
 	Create(ctx context.Context, user *User) (*User, error)
@@ -22,10 +24,6 @@ type GoogleClaims struct {
 
 type GoogleTokenVerifier interface {
 	Verify(ctx context.Context, rawToken string) (GoogleClaims, error)
-}
-
-type TokenIssuer interface {
-	Issue(user *User) (string, error)
 }
 
 // GoogleIdentityRepository resuelve y crea vínculos Google dentro de una transacción.

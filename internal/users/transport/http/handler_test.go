@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	authhttp "metry.uk/provext4/MetroTrackerBackend/internal/auth/transport/http"
 	"metry.uk/provext4/MetroTrackerBackend/internal/users/application"
 	"metry.uk/provext4/MetroTrackerBackend/internal/users/domain"
 )
@@ -68,7 +69,7 @@ func TestWriteDomainError(t *testing.T) {
 
 func TestGoogleLoginEndpoint(t *testing.T) {
 	user := &domain.User{ID: 4, Nombre: "Ana", Correo: "ana@example.com", EsActivo: true}
-	handler := NewHandler(nil, nil, nil, nil, nil, nil, googleLoginFake{result: &application.GoogleLoginResult{Token: "jwt", User: user}})
+	handler := authhttp.NewHandler(googleLoginFake{result: &application.GoogleLoginResult{Token: "opaque-token", User: user}}, nil)
 	tests := []struct {
 		name, body string
 		wantStatus int
@@ -80,13 +81,13 @@ func TestGoogleLoginEndpoint(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			recorder := httptest.NewRecorder()
-			handler.Routes().ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/auth/google", strings.NewReader(tt.body)))
+			handler.Routes().ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/google", strings.NewReader(tt.body)))
 			if recorder.Code != tt.wantStatus {
 				t.Fatalf("status = %d, quiere %d", recorder.Code, tt.wantStatus)
 			}
 			if tt.wantStatus == http.StatusOK {
-				var response GoogleLoginResponse
-				if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil || response.Token != "jwt" {
+				var response authhttp.GoogleLoginResponse
+				if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil || response.Token != "opaque-token" {
 					t.Fatalf("respuesta inesperada: %s", recorder.Body.String())
 				}
 			}

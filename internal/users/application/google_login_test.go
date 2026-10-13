@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	authdomain "metry.uk/provext4/MetroTrackerBackend/internal/auth/domain"
 	"metry.uk/provext4/MetroTrackerBackend/internal/users/domain"
 )
 
@@ -33,7 +34,15 @@ type tokenIssuerFake struct {
 	err   error
 }
 
-func (f tokenIssuerFake) Issue(*domain.User) (string, error) { return f.token, f.err }
+func (f tokenIssuerFake) Issue(context.Context, authdomain.Identity) (string, error) {
+	return f.token, f.err
+}
+
+func (f tokenIssuerFake) Authenticate(context.Context, string) (*authdomain.Identity, error) {
+	return nil, nil
+}
+
+func (f tokenIssuerFake) Revoke(context.Context, string) error { return nil }
 
 func TestGoogleLoginExecute(t *testing.T) {
 	infraErr := errors.New("database unavailable")

@@ -20,8 +20,10 @@ type Config struct {
 	DBMaxConns      int32
 	DBMinConns      int32
 	GoogleClientID  string
-	JWTSecret       string
-	JWTExpiration   time.Duration
+	JWTSecret       string        // Deprecated: retained for configuration compatibility.
+	JWTExpiration   time.Duration // Deprecated: use AuthTokenTTL.
+	AuthTokenTTL    time.Duration
+	AuthTokenPrefix string
 	DefaultRoleID   int32
 	DefaultGenderID int32
 }
@@ -43,6 +45,8 @@ func Load() (Config, error) {
 		GoogleClientID:  os.Getenv("GOOGLE_CLIENT_ID"),
 		JWTSecret:       os.Getenv("JWT_SECRET"),
 		JWTExpiration:   getEnvDuration("JWT_EXPIRATION", 24*time.Hour),
+		AuthTokenTTL:    getEnvDuration("AUTH_TOKEN_TTL", 24*time.Hour),
+		AuthTokenPrefix: getEnv("AUTH_TOKEN_PREFIX", "metrotracker:auth"),
 		DefaultRoleID:   getStrictEnvInt32("DEFAULT_ROLE_ID", 1),
 		DefaultGenderID: getStrictEnvInt32("DEFAULT_GENDER_ID", 1),
 	}
@@ -65,11 +69,11 @@ func Load() (Config, error) {
 	if cfg.GoogleClientID == "" {
 		return Config{}, errors.New("GOOGLE_CLIENT_ID is required")
 	}
-	if len(cfg.JWTSecret) < 32 {
-		return Config{}, errors.New("JWT_SECRET must contain at least 32 characters")
+	if cfg.AuthTokenTTL <= 0 {
+		return Config{}, errors.New("AUTH_TOKEN_TTL must be greater than zero")
 	}
-	if cfg.JWTExpiration <= 0 {
-		return Config{}, errors.New("JWT_EXPIRATION must be greater than zero")
+	if cfg.AuthTokenPrefix == "" {
+		return Config{}, errors.New("AUTH_TOKEN_PREFIX must not be empty")
 	}
 	if cfg.DefaultRoleID <= 0 || cfg.DefaultGenderID <= 0 {
 		return Config{}, errors.New("DEFAULT_ROLE_ID and DEFAULT_GENDER_ID must be greater than zero")

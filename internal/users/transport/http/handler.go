@@ -1,7 +1,6 @@
 package http
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -9,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	authhttp "metry.uk/provext4/MetroTrackerBackend/internal/auth/transport/http"
 	"metry.uk/provext4/MetroTrackerBackend/internal/platform/httpx"
 	"metry.uk/provext4/MetroTrackerBackend/internal/users/application"
 	"metry.uk/provext4/MetroTrackerBackend/internal/users/domain"
@@ -21,11 +21,7 @@ type Handler struct {
 	updateUser     *application.UpdateUser
 	deactivateUser *application.DeactivateUser
 	listaGeneros   *application.ListGenders
-	googleLogin    GoogleLoginUseCase
-}
-
-type GoogleLoginUseCase interface {
-	Execute(context.Context, string) (*application.GoogleLoginResult, error)
+	authMiddleware *authhttp.AuthMiddleware
 }
 
 func NewHandler(
@@ -35,12 +31,7 @@ func NewHandler(
 	updateUser *application.UpdateUser,
 	deactivateUser *application.DeactivateUser,
 	listGenders *application.ListGenders,
-	googleLogin ...GoogleLoginUseCase,
 ) *Handler {
-	var login GoogleLoginUseCase
-	if len(googleLogin) > 0 {
-		login = googleLogin[0]
-	}
 	return &Handler{
 		createUser:     createUser,
 		getUser:        getUser,
@@ -48,40 +39,33 @@ func NewHandler(
 		updateUser:     updateUser,
 		deactivateUser: deactivateUser,
 		listaGeneros:   listGenders,
-		googleLogin:    login,
 	}
+}
+
+func (h *Handler) SetAuthMiddleware(middleware *authhttp.AuthMiddleware) {
+	h.authMiddleware = middleware
 }
 
 func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
 
 	r.Post("/", h.create)
-	r.Post("/auth/google", h.google)
-
-	r.Get("/", h.list)
-
-	r.Get("/{id}", h.get)
-
-	r.Put("/{id}", h.update)
-
-	r.Delete("/{id}", h.deactivate)
-
-	r.Get("/genders", h.listGenders)
+	protected := func(r chi.Router) {
+		r.Get("/", h.list)
+		r.Get("/{id}", h.get)
+		r.Put("/{id}", h.update)
+		r.Delete("/{id}", h.deactivate)
+		r.Get("/genders", h.listGenders)
+	}
+	if h.authMiddleware != nil {
+		r.Group(func(r chi.Router) {
+			r.Use(h.authMiddleware.Require)
+			protected(r)
+		})
+	} else {
+		protected(r)
+	}
 	return r
-}
-
-func (h *Handler) google(w http.ResponseWriter, r *http.Request) {
-	var request GoogleLoginRequest
-	if err := decodeJSON(r, &request); err != nil || request.IDToken == "" {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	result, err := h.googleLogin.Execute(r.Context(), request.IDToken)
-	if err != nil {
-		h.writeDomainError(w, err)
-		return
-	}
-	httpx.WriteJSON(w, http.StatusOK, GoogleLoginResponse{Token: result.Token, User: toUserResponse(result.User)})
 }
 
 func (h *Handler) create(

@@ -34,15 +34,6 @@ type UpdateUserRequest struct {
 	IDGenero int32 `json:"idGenero"`
 }
 
-type GoogleLoginRequest struct {
-	IDToken string `json:"idToken"`
-}
-
-type GoogleLoginResponse struct {
-	Token string        `json:"token"`
-	User  *UserResponse `json:"user"`
-}
-
 type UserResponse struct {
 	ID int32 `json:"id"`
 
