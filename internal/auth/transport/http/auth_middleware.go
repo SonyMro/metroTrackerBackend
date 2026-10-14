@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -33,14 +34,15 @@ func (m *AuthMiddleware) Require(next http.Handler) http.Handler {
 		}
 		header := r.Header.Get("Authorization")
 		const prefix = "Bearer "
-		if !strings.HasPrefix(header, prefix) || strings.TrimSpace(strings.TrimPrefix(header, prefix)) == "" {
+		token := strings.TrimPrefix(header, prefix)
+		if !strings.HasPrefix(header, prefix) || token == "" || strings.TrimSpace(token) != token || strings.ContainsAny(token, " \t\r\n") {
 			httpx.WriteError(w, http.StatusUnauthorized, "authentication required")
 			return
 		}
-		identity, err := m.authenticate.Execute(r.Context(), strings.TrimSpace(strings.TrimPrefix(header, prefix)))
+		identity, err := m.authenticate.Execute(r.Context(), token)
 		if err != nil {
 			status := http.StatusUnauthorized
-			if err == authdomain.ErrInactiveUser {
+			if errors.Is(err, authdomain.ErrInactiveUser) {
 				status = http.StatusForbidden
 			}
 			httpx.WriteError(w, status, "invalid authentication token")

@@ -34,6 +34,13 @@ type UpdateUserRequest struct {
 	IDGenero int32 `json:"idGenero"`
 }
 
+type CreateUserResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	Nombre       string `json:"nombre"`
+	Correo       string `json:"correo"`
+}
+
 type UserResponse struct {
 	ID int32 `json:"id"`
 

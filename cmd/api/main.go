@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	authapplication "metry.uk/provext4/MetroTrackerBackend/internal/auth/application"
+	authpostgres "metry.uk/provext4/MetroTrackerBackend/internal/auth/infrastructure/postgres"
 	authredis "metry.uk/provext4/MetroTrackerBackend/internal/auth/infrastructure/redis"
 	authhttp "metry.uk/provext4/MetroTrackerBackend/internal/auth/transport/http"
 	"metry.uk/provext4/MetroTrackerBackend/internal/platform/config"
@@ -24,6 +25,7 @@ import (
 	userapplication "metry.uk/provext4/MetroTrackerBackend/internal/users/application"
 	userdomain "metry.uk/provext4/MetroTrackerBackend/internal/users/domain"
 	usergoogle "metry.uk/provext4/MetroTrackerBackend/internal/users/infrastructure/google"
+	userjwt "metry.uk/provext4/MetroTrackerBackend/internal/users/infrastructure/jwt"
 	userpostgres "metry.uk/provext4/MetroTrackerBackend/internal/users/infrastructure/postgres"
 	userhttp "metry.uk/provext4/MetroTrackerBackend/internal/users/transport/http"
 
@@ -87,6 +89,17 @@ func main() {
 		)
 	}
 
+	tokenStore, err := authredis.NewTokenStore(redisClient, cfg.AuthTokenPrefix, cfg.AuthTokenTTL)
+	if err != nil {
+		log.Fatalf("auth token store configuration error: %v", err)
+	}
+	jwtIssuer, err := userjwt.NewIssuer(cfg.JWTSecret, cfg.JWTExpiration)
+	if err != nil {
+		log.Fatalf("JWT configuration error: %v", err)
+	}
+	refreshRepository := authpostgres.NewRefreshTokenRepository(dbPool)
+	sessions := authapplication.NewSessionService(jwtIssuer, tokenStore, refreshRepository, cfg.JWTExpiration)
+
 	// Estas capas conectan la persistencia con los casos de uso y el handler HTTP de usuarios.
 	userRepository := userpostgres.NewUserRepository(
 		dbPool,
@@ -94,6 +107,7 @@ func main() {
 
 	createUser := userapplication.NewCreateUser(
 		userRepository,
+		sessions,
 	)
 
 	getUser := userapplication.NewGetUser(
@@ -119,14 +133,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Google verifier configuration error: %v", err)
 	}
-	tokenStore, err := authredis.NewTokenStore(redisClient, cfg.AuthTokenPrefix, cfg.AuthTokenTTL)
-	if err != nil {
-		log.Fatalf("auth token store configuration error: %v", err)
-	}
 	googleLogin := userapplication.NewGoogleLogin(
 		googleVerifier,
 		userRepository,
-		tokenStore,
+		sessions,
 		cfg.DefaultRoleID,
 		cfg.DefaultGenderID,
 	)
@@ -138,10 +148,12 @@ func main() {
 		deactivateUser,
 		listGenders,
 	)
-	authenticateToken := authapplication.NewAuthenticateToken(tokenStore, authUserReader{repository: userRepository})
+	login := authapplication.NewLogin(userRepository, sessions, refreshRepository, cfg.JWTExpiration)
+	refresh := authapplication.NewRefresh(userRepository, sessions, refreshRepository, cfg.JWTExpiration)
+	authenticateToken := authapplication.NewAuthenticateToken(tokenStore, jwtIssuer, authUserReader{repository: userRepository})
 	authMiddleware := authhttp.NewAuthMiddleware(authenticateToken)
 	userHandler.SetAuthMiddleware(authMiddleware)
-	authHandler := authhttp.NewHandler(googleLogin, authenticateToken)
+	authHandler := authhttp.NewHandler(googleLogin, authenticateToken, login, refresh)
 
 	mapaRepository := mapapostgres.NewMapaRepository(
 		dbPool,
@@ -239,7 +251,7 @@ func main() {
 		"/api/v1",
 		func(r chi.Router) {
 			// Auth se monta antes del router general para conservar explícitamente sus endpoints públicos.
-			r.Mount("/users/auth", authHandler.Routes())
+			r.Mount("/auth", authHandler.Routes())
 			// Las rutas versionadas de usuarios se montan bajo el handler de transporte.
 			r.Mount("/users", userHandler.Routes())
 			r.With(authMiddleware.Require).Mount("/maps", mapasHandler.Routes())

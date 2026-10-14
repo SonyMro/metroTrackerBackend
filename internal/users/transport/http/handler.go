@@ -109,8 +109,13 @@ func (h *Handler) create(
 
 	httpx.WriteJSON(
 		w,
-		http.StatusCreated,
-		toUserResponse(created),
+		http.StatusOK,
+		CreateUserResponse{
+			AccessToken:  created.AccessToken,
+			RefreshToken: created.RefreshToken,
+			Nombre:       created.User.Nombre,
+			Correo:       created.User.Correo,
+		},
 	)
 }
 

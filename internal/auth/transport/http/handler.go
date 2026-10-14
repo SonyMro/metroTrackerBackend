@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"metry.uk/provext4/MetroTrackerBackend/internal/auth/application"
@@ -17,23 +19,72 @@ import (
 type Handler struct {
 	googleLogin  GoogleLoginUseCase
 	authenticate *application.AuthenticateToken
+	login        *application.Login
+	refresh      *application.Refresh
 }
 
 type GoogleLoginUseCase interface {
 	Execute(context.Context, string) (*userapplication.GoogleLoginResult, error)
 }
 
-func NewHandler(googleLogin GoogleLoginUseCase, authenticate *application.AuthenticateToken) *Handler {
-	return &Handler{googleLogin: googleLogin, authenticate: authenticate}
+func NewHandler(googleLogin GoogleLoginUseCase, authenticate *application.AuthenticateToken, cases ...any) *Handler {
+	h := &Handler{googleLogin: googleLogin, authenticate: authenticate}
+	for _, value := range cases {
+		switch v := value.(type) {
+		case *application.Login:
+			h.login = v
+		case *application.Refresh:
+			h.refresh = v
+		}
+	}
+	return h
 }
 
 func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Post("/google", h.google)
+	r.Post("/login", h.loginHandler)
+	r.Post("/refresh", h.refreshHandler)
 	r.Get("/introspect", h.introspect)
 	r.Post("/introspect", h.introspect)
 	r.Post("/logout", h.logout)
 	return r
+}
+
+func (h *Handler) loginHandler(w http.ResponseWriter, r *http.Request) {
+	if h.login == nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	var req LoginRequest
+	if decodeJSON(r, &req) != nil || strings.TrimSpace(req.Email) == "" || req.Password == "" {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	result, err := h.login.Execute(r.Context(), req.Email, req.Password)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, AuthUserResponse{AccessToken: result.AccessToken, RefreshToken: result.RefreshToken, Nombre: result.Nombre, Correo: result.Correo})
+}
+
+func (h *Handler) refreshHandler(w http.ResponseWriter, r *http.Request) {
+	if h.refresh == nil {
+		httpx.WriteError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	var req RefreshRequest
+	if decodeJSON(r, &req) != nil || strings.TrimSpace(req.RefreshToken) == "" {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	result, err := h.refresh.Execute(r.Context(), req.RefreshToken)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, TokenResponse{AccessToken: result.AccessToken, RefreshToken: result.RefreshToken})
 }
 
 func (h *Handler) google(w http.ResponseWriter, r *http.Request) {
@@ -47,7 +98,7 @@ func (h *Handler) google(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, GoogleLoginResponse{Token: result.Token, User: toUserResponse(result.User)})
+	httpx.WriteJSON(w, http.StatusOK, AuthUserResponse{AccessToken: result.AccessToken, RefreshToken: result.RefreshToken, Nombre: result.User.Nombre, Correo: result.User.Correo})
 }
 
 func (h *Handler) introspect(w http.ResponseWriter, r *http.Request) {
@@ -87,6 +138,8 @@ func (h *Handler) writeError(w http.ResponseWriter, err error) {
 		httpx.WriteError(w, http.StatusForbidden, "user account is inactive")
 	case errors.Is(err, authdomain.ErrInvalidSession), errors.Is(err, authdomain.ErrSessionNotFound):
 		httpx.WriteError(w, http.StatusUnauthorized, "invalid authentication token")
+	case errors.Is(err, authdomain.ErrInvalidRefreshToken), errors.Is(err, authdomain.ErrExpiredRefreshToken), errors.Is(err, authdomain.ErrReusedRefreshToken):
+		httpx.WriteError(w, http.StatusUnauthorized, "invalid refresh token")
 	default:
 		httpx.WriteError(w, http.StatusInternalServerError, "internal server error")
 	}
@@ -99,16 +152,20 @@ func bearerToken(r *http.Request) (string, bool) {
 		return "", false
 	}
 	token := header[len(prefix):]
-	return token, token != "" && token[0] != ' '
+	return token, token != "" && strings.TrimSpace(token) == token && !strings.ContainsAny(token, " \t\r\n")
 }
 
 type GoogleLoginRequest struct {
 	IDToken string `json:"idToken"`
 }
+
+// GoogleLoginResponse se conserva para compatibilidad con consumidores internos
+// de la capa de transporte; el endpoint ya responde AuthUserResponse.
 type GoogleLoginResponse struct {
 	Token string        `json:"token"`
 	User  *UserResponse `json:"user"`
 }
+
 type UserResponse struct {
 	ID       int32  `json:"id"`
 	Nombre   string `json:"nombre"`
@@ -120,13 +177,15 @@ type UserResponse struct {
 	EsActivo bool   `json:"esActivo"`
 }
 
-func toUserResponse(user *userdomain.User) *UserResponse {
-	if user == nil {
-		return nil
-	}
-	return &UserResponse{ID: user.ID, Nombre: user.Nombre, Apepat: user.Apepat, Apemat: user.Apemat, Correo: user.Correo, IDRol: user.IDRol, IDGenero: user.IDGenero, EsActivo: user.EsActivo}
-}
-
 func decodeJSON(r *http.Request, target any) error {
-	return json.NewDecoder(r.Body).Decode(target)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		return err
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		return errors.New("multiple JSON values")
+	}
+	return nil
 }

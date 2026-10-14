@@ -7,25 +7,37 @@ import (
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
+	authdomain "metry.uk/provext4/MetroTrackerBackend/internal/auth/domain"
 	"metry.uk/provext4/MetroTrackerBackend/internal/users/domain"
 )
 
 type CreateUser struct {
 	repository domain.UserRepository
+	sessions   authdomain.SessionStore
 }
 
-func NewCreateUser(
-	repository domain.UserRepository,
-) *CreateUser {
+type CreateUserResult struct {
+	User         *domain.User
+	Token        string
+	RefreshToken string
+	AccessToken  string
+}
+
+func NewCreateUser(repository domain.UserRepository, sessions ...authdomain.SessionStore) *CreateUser {
+	var sessionStore authdomain.SessionStore
+	if len(sessions) > 0 {
+		sessionStore = sessions[0]
+	}
 	return &CreateUser{
 		repository: repository,
+		sessions:   sessionStore,
 	}
 }
 
 func (uc *CreateUser) Execute(
 	ctx context.Context,
 	user *domain.User,
-) (*domain.User, error) {
+) (*CreateUserResult, error) {
 	normalizeNames(user)
 	user.Correo = strings.ToLower(
 		strings.TrimSpace(user.Correo),
@@ -71,7 +83,21 @@ func (uc *CreateUser) Execute(
 	if err != nil {
 		return nil, fmt.Errorf("crear usuario: %w", err)
 	}
-	return created, nil
+	result := &CreateUserResult{User: created}
+	if uc.sessions != nil {
+		identity := authdomain.Identity{UserID: created.ID, RoleID: created.IDRol}
+		if pairIssuer, ok := uc.sessions.(authdomain.SessionPairIssuer); ok {
+			result.AccessToken, result.RefreshToken, err = pairIssuer.IssuePair(ctx, identity)
+			result.Token = result.AccessToken
+		} else {
+			result.Token, err = uc.sessions.Issue(ctx, identity)
+			result.AccessToken = result.Token
+		}
+		if err != nil {
+			return nil, fmt.Errorf("emitir sesión de usuario: %w", err)
+		}
+	}
+	return result, nil
 }
 
 func normalizeNames(user *domain.User) {

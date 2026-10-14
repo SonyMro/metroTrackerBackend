@@ -12,19 +12,24 @@ type UserReader interface {
 }
 
 type AuthenticateToken struct {
-	sessions authdomain.SessionStore
-	users    UserReader
+	phantom authdomain.PhantomStore
+	jwt     authdomain.JWTService
+	users   UserReader
 }
 
-func NewAuthenticateToken(sessions authdomain.SessionStore, users UserReader) *AuthenticateToken {
-	return &AuthenticateToken{sessions: sessions, users: users}
+func NewAuthenticateToken(phantom authdomain.PhantomStore, jwt authdomain.JWTService, users UserReader) *AuthenticateToken {
+	return &AuthenticateToken{phantom: phantom, jwt: jwt, users: users}
 }
 
 func (uc *AuthenticateToken) Execute(ctx context.Context, token string) (*authdomain.Identity, error) {
-	if strings.TrimSpace(token) == "" {
+	if strings.TrimSpace(token) == "" || uc == nil || uc.phantom == nil || uc.jwt == nil || uc.users == nil {
 		return nil, authdomain.ErrInvalidSession
 	}
-	identity, err := uc.sessions.Authenticate(ctx, token)
+	rawJWT, err := uc.phantom.Resolve(ctx, token)
+	if err != nil {
+		return nil, authdomain.ErrInvalidSession
+	}
+	identity, err := uc.jwt.Verify(ctx, rawJWT)
 	if err != nil {
 		return nil, err
 	}
@@ -43,5 +48,5 @@ func (uc *AuthenticateToken) Revoke(ctx context.Context, token string) error {
 	if strings.TrimSpace(token) == "" {
 		return authdomain.ErrInvalidSession
 	}
-	return uc.sessions.Revoke(ctx, token)
+	return uc.phantom.Revoke(ctx, token)
 }

@@ -69,7 +69,7 @@ func TestWriteDomainError(t *testing.T) {
 
 func TestGoogleLoginEndpoint(t *testing.T) {
 	user := &domain.User{ID: 4, Nombre: "Ana", Correo: "ana@example.com", EsActivo: true}
-	handler := authhttp.NewHandler(googleLoginFake{result: &application.GoogleLoginResult{Token: "opaque-token", User: user}}, nil)
+	handler := authhttp.NewHandler(googleLoginFake{result: &application.GoogleLoginResult{AccessToken: "opaque-token", RefreshToken: "refresh-token", User: user}}, nil)
 	tests := []struct {
 		name, body string
 		wantStatus int
@@ -86,8 +86,8 @@ func TestGoogleLoginEndpoint(t *testing.T) {
 				t.Fatalf("status = %d, quiere %d", recorder.Code, tt.wantStatus)
 			}
 			if tt.wantStatus == http.StatusOK {
-				var response authhttp.GoogleLoginResponse
-				if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil || response.Token != "opaque-token" {
+				var response authhttp.AuthUserResponse
+				if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil || response.AccessToken != "opaque-token" || response.RefreshToken != "refresh-token" || response.Nombre != "Ana" || response.Correo != "ana@example.com" {
 					t.Fatalf("respuesta inesperada: %s", recorder.Body.String())
 				}
 			}

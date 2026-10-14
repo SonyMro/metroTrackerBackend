@@ -23,8 +23,10 @@ func NewGoogleLogin(verifier domain.GoogleTokenVerifier, identities domain.Googl
 }
 
 type GoogleLoginResult struct {
-	Token string
-	User  *domain.User
+	Token        string
+	AccessToken  string
+	RefreshToken string
+	User         *domain.User
 }
 
 func (uc *GoogleLogin) Execute(ctx context.Context, rawToken string) (*GoogleLoginResult, error) {
@@ -51,9 +53,15 @@ func (uc *GoogleLogin) Execute(ctx context.Context, rawToken string) (*GoogleLog
 	if user == nil || !user.EsActivo {
 		return nil, domain.ErrInactiveUser
 	}
-	token, err := uc.issuer.Issue(ctx, authdomain.Identity{UserID: user.ID, RoleID: user.IDRol})
+	identity := authdomain.Identity{UserID: user.ID, RoleID: user.IDRol}
+	var token, refreshToken string
+	if pairIssuer, ok := uc.issuer.(authdomain.SessionPairIssuer); ok {
+		token, refreshToken, err = pairIssuer.IssuePair(ctx, identity)
+	} else {
+		token, err = uc.issuer.Issue(ctx, identity)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("emitir token de aplicación: %w", err)
 	}
-	return &GoogleLoginResult{Token: token, User: user}, nil
+	return &GoogleLoginResult{Token: token, AccessToken: token, RefreshToken: refreshToken, User: user}, nil
 }

@@ -19,8 +19,26 @@ type Identity struct {
 	ExpiresAt time.Time
 }
 
+type IssuedJWT struct {
+	Token     string
+	ExpiresAt time.Time
+}
+
+type JWTService interface {
+	Issue(context.Context, Identity) (IssuedJWT, error)
+	Verify(context.Context, string) (*Identity, error)
+}
+
+type PhantomStore interface {
+	Create(context.Context, string, time.Time) (string, error)
+	Resolve(context.Context, string) (string, error)
+	Revoke(context.Context, string) error
+}
+
 type SessionStore interface {
 	Issue(context.Context, Identity) (string, error)
-	Authenticate(context.Context, string) (*Identity, error)
-	Revoke(context.Context, string) error
+}
+
+type SessionPairIssuer interface {
+	IssuePair(context.Context, Identity) (accessToken, refreshToken string, err error)
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"strconv"
 	"strings"
 	"time"
 
@@ -27,14 +26,11 @@ func NewTokenStore(client *goredis.Client, prefix string, ttl time.Duration) (*T
 
 func (s *TokenStore) key(token string) string { return s.prefix + ":" + token }
 
-func (s *TokenStore) Issue(ctx context.Context, identity authdomain.Identity) (string, error) {
-	if identity.UserID <= 0 {
+func (s *TokenStore) Create(ctx context.Context, signedJWT string, expiresAt time.Time) (string, error) {
+	if strings.TrimSpace(signedJWT) == "" {
 		return "", authdomain.ErrInvalidSession
 	}
-	if identity.ExpiresAt.IsZero() {
-		identity.ExpiresAt = time.Now().Add(s.ttl)
-	}
-	ttl := time.Until(identity.ExpiresAt)
+	ttl := time.Until(expiresAt)
 	if ttl <= 0 {
 		return "", authdomain.ErrInvalidSession
 	}
@@ -44,37 +40,25 @@ func (s *TokenStore) Issue(ctx context.Context, identity authdomain.Identity) (s
 	}
 	token := base64.RawURLEncoding.EncodeToString(raw)
 	key := s.key(token)
-	pipe := s.client.TxPipeline()
-	pipe.HSet(ctx, key, "user_id", identity.UserID, "role_id", identity.RoleID, "expires_at", identity.ExpiresAt.Unix())
-	pipe.Expire(ctx, key, ttl)
-	if _, err := pipe.Exec(ctx); err != nil {
+	if err := s.client.Set(ctx, key, signedJWT, ttl).Err(); err != nil {
 		return "", err
 	}
 	return token, nil
 }
 
-func (s *TokenStore) Authenticate(ctx context.Context, token string) (*authdomain.Identity, error) {
+func (s *TokenStore) Resolve(ctx context.Context, token string) (string, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
-		return nil, authdomain.ErrInvalidSession
+		return "", authdomain.ErrInvalidSession
 	}
-	values, err := s.client.HGetAll(ctx, s.key(token)).Result()
+	value, err := s.client.Get(ctx, s.key(token)).Result()
+	if err == goredis.Nil {
+		return "", authdomain.ErrSessionNotFound
+	}
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	if len(values) == 0 {
-		return nil, authdomain.ErrSessionNotFound
-	}
-	userID, err := strconv.ParseInt(values["user_id"], 10, 32)
-	if err != nil || userID <= 0 {
-		return nil, authdomain.ErrInvalidSession
-	}
-	roleID, _ := strconv.ParseInt(values["role_id"], 10, 32)
-	expires, err := strconv.ParseInt(values["expires_at"], 10, 64)
-	if err != nil || time.Now().Unix() >= expires {
-		return nil, authdomain.ErrSessionNotFound
-	}
-	return &authdomain.Identity{UserID: int32(userID), RoleID: int32(roleID), ExpiresAt: time.Unix(expires, 0)}, nil
+	return value, nil
 }
 
 func (s *TokenStore) Revoke(ctx context.Context, token string) error {
