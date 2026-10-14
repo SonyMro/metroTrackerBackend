@@ -12,8 +12,6 @@ import (
 type fakeUserRepository struct {
 	getByEmail func(context.Context, string) (*domain.User, error)
 	create     func(context.Context, *domain.User) (*domain.User, error)
-	list       func(context.Context, int, int) ([]*domain.User, error)
-	count      func(context.Context) (int, error)
 }
 
 // ListGeneros implements [domain.UserRepository].
@@ -30,10 +28,6 @@ func (f fakeUserRepository) GetByID(context.Context, int32) (*domain.User, error
 func (f fakeUserRepository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
 	return f.getByEmail(ctx, email)
 }
-func (f fakeUserRepository) List(ctx context.Context, limit, offset int) ([]*domain.User, error) {
-	return f.list(ctx, limit, offset)
-}
-func (f fakeUserRepository) Count(ctx context.Context) (int, error)     { return f.count(ctx) }
 func (f fakeUserRepository) Update(context.Context, *domain.User) error { return nil }
 func (f fakeUserRepository) Deactivate(context.Context, int32) error    { return nil }
 
@@ -48,15 +42,14 @@ func TestCreateUserExecute(t *testing.T) {
 		want        error
 		verify      func(*testing.T, *domain.User)
 	}{
-		{name: "normaliza y hashea", user: &domain.User{Nombre: " Ana ", Apepat: " Pérez ", Apemat: " Díaz ", Correo: " ANA@EXAMPLE.COM ", Password: "password8", IDRol: 1, IDGenero: 1}, emailErr: domain.ErrUserNotFound, verify: func(t *testing.T, user *domain.User) {
+		{name: "normaliza y hashea", user: &domain.User{Nombre: " Ana ", Apepat: " Pérez ", Apemat: " Díaz ", Correo: " ANA@EXAMPLE.COM ", Password: "password8", IDGenero: 1}, emailErr: domain.ErrUserNotFound, verify: func(t *testing.T, user *domain.User) {
 			if user.Correo != "ana@example.com" || user.Nombre != "Ana" || bcrypt.CompareHashAndPassword([]byte(user.Password), []byte("password8")) != nil {
 				t.Fatal("usuario no normalizado o contraseña sin hash")
 			}
 		}},
-		{name: "contraseña corta", user: &domain.User{Nombre: "Ana", Apepat: "Pérez", Correo: "a@b.c", Password: "short", IDRol: 1, IDGenero: 1}, want: domain.ErrInvalidPassword},
-		{name: "rol inválido", user: &domain.User{Nombre: "Ana", Apepat: "Pérez", Correo: "a@b.c", Password: "password8", IDGenero: 1}, want: domain.ErrInvalidUser},
-		{name: "correo duplicado", user: &domain.User{Nombre: "Ana", Apepat: "Pérez", Correo: "a@b.c", Password: "password8", IDRol: 1, IDGenero: 1}, emailResult: &domain.User{}, want: domain.ErrEmailAlreadyExists},
-		{name: "propaga infraestructura", user: &domain.User{Nombre: "Ana", Apepat: "Pérez", Correo: "a@b.c", Password: "password8", IDRol: 1, IDGenero: 1}, emailErr: infraErr, want: infraErr},
+		{name: "contraseña corta", user: &domain.User{Nombre: "Ana", Apepat: "Pérez", Correo: "a@b.c", Password: "short", IDGenero: 1}, want: domain.ErrInvalidPassword},
+		{name: "correo duplicado", user: &domain.User{Nombre: "Ana", Apepat: "Pérez", Correo: "a@b.c", Password: "password8", IDGenero: 1}, emailResult: &domain.User{}, want: domain.ErrEmailAlreadyExists},
+		{name: "propaga infraestructura", user: &domain.User{Nombre: "Ana", Apepat: "Pérez", Correo: "a@b.c", Password: "password8", IDGenero: 1}, emailErr: infraErr, want: infraErr},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -45,7 +45,7 @@ func (uc *CreateUser) Execute(
 
 	if user.Nombre == "" ||
 		user.Apepat == "" ||
-		user.Correo == "" || user.IDRol <= 0 || user.IDGenero <= 0 {
+		user.Correo == "" || user.IDGenero <= 0 {
 		return nil, domain.ErrInvalidUser
 	}
 
@@ -85,7 +85,7 @@ func (uc *CreateUser) Execute(
 	}
 	result := &CreateUserResult{User: created}
 	if uc.sessions != nil {
-		identity := authdomain.Identity{UserID: created.ID, RoleID: created.IDRol}
+		identity := authdomain.Identity{UserID: created.ID}
 		if pairIssuer, ok := uc.sessions.(authdomain.SessionPairIssuer); ok {
 			result.AccessToken, result.RefreshToken, err = pairIssuer.IssuePair(ctx, identity)
 			result.Token = result.AccessToken

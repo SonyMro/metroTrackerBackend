@@ -17,8 +17,6 @@ type CreateUserRequest struct {
 
 	Password string `json:"password"`
 
-	IDRol int32 `json:"idRol"`
-
 	IDGenero int32 `json:"idGenero"`
 }
 
@@ -28,8 +26,6 @@ type UpdateUserRequest struct {
 	Apepat string `json:"apepat"`
 
 	Apemat string `json:"apemat"`
-
-	IDRol int32 `json:"idRol"`
 
 	IDGenero int32 `json:"idGenero"`
 }
@@ -56,10 +52,6 @@ type UserResponse struct {
 
 	FechaAct time.Time `json:"fechaAct"`
 
-	IDRol int32 `json:"idRol"`
-
-	Rol *RoleResponse `json:"rol,omitempty"`
-
 	IDGenero int32 `json:"idGenero"`
 
 	Genero *GenderResponse `json:"genero,omitempty"`
@@ -67,28 +59,10 @@ type UserResponse struct {
 	EsActivo bool `json:"esActivo"`
 }
 
-type RoleResponse struct {
-	ID int32 `json:"id"`
-
-	Nombre string `json:"nombre"`
-}
-
 type GenderResponse struct {
 	ID int32 `json:"id"`
 
 	Tipo string `json:"tipo"`
-}
-
-type UserListResponse struct {
-	Items []*UserResponse `json:"items"`
-
-	Page int `json:"page"`
-
-	PageSize int `json:"pageSize"`
-
-	Total int `json:"total"`
-
-	TotalPages int `json:"totalPages"`
 }
 
 func toUserResponse(
@@ -102,16 +76,8 @@ func toUserResponse(
 		Correo:        user.Correo,
 		FechaRegistro: user.FechaRegistro,
 		FechaAct:      user.FechaAct,
-		IDRol:         user.IDRol,
 		IDGenero:      user.IDGenero,
 		EsActivo:      user.EsActivo,
-	}
-
-	if user.Rol != nil {
-		response.Rol = &RoleResponse{
-			ID:     user.Rol.ID,
-			Nombre: user.Rol.Nombre,
-		}
 	}
 
 	if user.Genero != nil {

@@ -15,7 +15,6 @@ var (
 
 type Identity struct {
 	UserID    int32
-	RoleID    int32
 	ExpiresAt time.Time
 }
 

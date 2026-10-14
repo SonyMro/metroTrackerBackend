@@ -25,10 +25,9 @@ func (uc *UpdateUser) Execute(
 	nombre string,
 	apepat string,
 	apemat string,
-	idRol int32,
 	idGenero int32,
 ) error {
-	if id <= 0 || idRol <= 0 || idGenero <= 0 {
+	if id <= 0 || idGenero <= 0 {
 		return domain.ErrInvalidUser
 	}
 	user, err := uc.repository.GetByID(ctx, id)
@@ -41,7 +40,6 @@ func (uc *UpdateUser) Execute(
 	user.Apepat = apepat
 	user.Apemat = apemat
 	normalizeNames(user)
-	user.IDRol = idRol
 	user.IDGenero = idGenero
 
 	if user.Nombre == "" ||

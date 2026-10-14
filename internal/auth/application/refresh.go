@@ -35,7 +35,7 @@ func (uc *Refresh) Execute(ctx context.Context, presented string) (*LoginResult,
 		return nil, authdomain.ErrInactiveUser
 	}
 	newToken.UserID = user.ID
-	access, err := uc.sessions.Issue(ctx, authdomain.Identity{UserID: user.ID, RoleID: user.IDRol})
+	access, err := uc.sessions.Issue(ctx, authdomain.Identity{UserID: user.ID})
 	if err != nil {
 		return nil, fmt.Errorf("issue access token: %w", err)
 	}

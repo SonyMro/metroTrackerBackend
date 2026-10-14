@@ -16,6 +16,8 @@ import (
 	userdomain "metry.uk/provext4/MetroTrackerBackend/internal/users/domain"
 )
 
+const internalServerErrorMessage = "internal server error"
+
 type Handler struct {
 	googleLogin  GoogleLoginUseCase
 	authenticate *application.AuthenticateToken
@@ -53,12 +55,12 @@ func (h *Handler) Routes() chi.Router {
 
 func (h *Handler) loginHandler(w http.ResponseWriter, r *http.Request) {
 	if h.login == nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "internal server error")
+		httpx.WriteError(w, http.StatusInternalServerError, internalServerErrorMessage)
 		return
 	}
 	var req LoginRequest
 	if decodeJSON(r, &req) != nil || strings.TrimSpace(req.Email) == "" || req.Password == "" {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid request body")
+		httpx.WriteError(w, http.StatusBadRequest, internalServerErrorMessage)
 		return
 	}
 	result, err := h.login.Execute(r.Context(), req.Email, req.Password)
@@ -71,12 +73,12 @@ func (h *Handler) loginHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) refreshHandler(w http.ResponseWriter, r *http.Request) {
 	if h.refresh == nil {
-		httpx.WriteError(w, http.StatusInternalServerError, "internal server error")
+		httpx.WriteError(w, http.StatusInternalServerError, internalServerErrorMessage)
 		return
 	}
 	var req RefreshRequest
 	if decodeJSON(r, &req) != nil || strings.TrimSpace(req.RefreshToken) == "" {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid request body")
+		httpx.WriteError(w, http.StatusBadRequest, internalServerErrorMessage)
 		return
 	}
 	result, err := h.refresh.Execute(r.Context(), req.RefreshToken)
@@ -90,7 +92,7 @@ func (h *Handler) refreshHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) google(w http.ResponseWriter, r *http.Request) {
 	var request GoogleLoginRequest
 	if err := decodeJSON(r, &request); err != nil || request.IDToken == "" {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid request body")
+		httpx.WriteError(w, http.StatusBadRequest, internalServerErrorMessage)
 		return
 	}
 	result, err := h.googleLogin.Execute(r.Context(), request.IDToken)
@@ -112,7 +114,7 @@ func (h *Handler) introspect(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteJSON(w, http.StatusOK, IntrospectResponse{Active: false})
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, IntrospectResponse{Active: true, UserID: identity.UserID, RoleID: identity.RoleID, ExpiresAt: identity.ExpiresAt})
+	httpx.WriteJSON(w, http.StatusOK, IntrospectResponse{Active: true, UserID: identity.UserID, ExpiresAt: identity.ExpiresAt})
 }
 
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
@@ -141,7 +143,7 @@ func (h *Handler) writeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, authdomain.ErrInvalidRefreshToken), errors.Is(err, authdomain.ErrExpiredRefreshToken), errors.Is(err, authdomain.ErrReusedRefreshToken):
 		httpx.WriteError(w, http.StatusUnauthorized, "invalid refresh token")
 	default:
-		httpx.WriteError(w, http.StatusInternalServerError, "internal server error")
+		httpx.WriteError(w, http.StatusInternalServerError, internalServerErrorMessage)
 	}
 }
 
@@ -172,7 +174,6 @@ type UserResponse struct {
 	Apepat   string `json:"apepat"`
 	Apemat   string `json:"apemat"`
 	Correo   string `json:"correo"`
-	IDRol    int32  `json:"idRol"`
 	IDGenero int32  `json:"idGenero"`
 	EsActivo bool   `json:"esActivo"`
 }

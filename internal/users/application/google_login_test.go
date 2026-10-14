@@ -24,7 +24,7 @@ type googleIdentityFake struct {
 	claim domain.GoogleClaims
 }
 
-func (f *googleIdentityFake) ResolveGoogleIdentity(_ context.Context, claims domain.GoogleClaims, _, _ int32) (*domain.User, error) {
+func (f *googleIdentityFake) ResolveGoogleIdentity(_ context.Context, claims domain.GoogleClaims, _ int32) (*domain.User, error) {
 	f.claim = claims
 	return f.user, f.err
 }
@@ -66,7 +66,7 @@ func TestGoogleLoginExecute(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			identity := &googleIdentityFake{user: tt.identity, err: tt.identityErr}
-			uc := NewGoogleLogin(googleVerifierFake{claims: tt.claims, err: tt.verifyErr}, identity, tokenIssuerFake{token: "app-token", err: tt.issueErr}, 2, 3)
+			uc := NewGoogleLogin(googleVerifierFake{claims: tt.claims, err: tt.verifyErr}, identity, tokenIssuerFake{token: "app-token", err: tt.issueErr}, 3)
 			result, err := uc.Execute(context.Background(), "google-token")
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("error = %v, quiere %v", err, tt.wantErr)

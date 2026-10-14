@@ -114,10 +114,6 @@ func main() {
 		userRepository,
 	)
 
-	listUsers := userapplication.NewListUsers(
-		userRepository,
-	)
-
 	updateUser := userapplication.NewUpdateUser(
 		userRepository,
 	)
@@ -137,13 +133,11 @@ func main() {
 		googleVerifier,
 		userRepository,
 		sessions,
-		cfg.DefaultRoleID,
 		cfg.DefaultGenderID,
 	)
 	userHandler := userhttp.NewHandler(
 		createUser,
 		getUser,
-		listUsers,
 		updateUser,
 		deactivateUser,
 		listGenders,
@@ -335,13 +329,13 @@ func main() {
 
 type authUserReader struct{ repository userdomain.UserRepository }
 
-func (r authUserReader) AuthUser(ctx context.Context, id int32) (int32, bool, error) {
+func (r authUserReader) AuthUser(ctx context.Context, id int32) (bool, error) {
 	user, err := r.repository.GetByID(ctx, id)
 	if err != nil {
-		return 0, false, err
+		return false, err
 	}
 	if user == nil {
-		return 0, false, nil
+		return false, nil
 	}
-	return user.IDRol, user.EsActivo, nil
+	return user.EsActivo, nil
 }

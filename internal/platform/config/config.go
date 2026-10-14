@@ -24,7 +24,6 @@ type Config struct {
 	JWTExpiration   time.Duration
 	AuthTokenTTL    time.Duration
 	AuthTokenPrefix string
-	DefaultRoleID   int32
 	DefaultGenderID int32
 }
 
@@ -47,7 +46,6 @@ func Load() (Config, error) {
 		JWTExpiration:   getEnvDuration("JWT_EXPIRATION", 24*time.Hour),
 		AuthTokenTTL:    getEnvDuration("AUTH_TOKEN_TTL", 24*time.Hour),
 		AuthTokenPrefix: getEnv("AUTH_TOKEN_PREFIX", "phantom"),
-		DefaultRoleID:   getStrictEnvInt32("DEFAULT_ROLE_ID", 1),
 		DefaultGenderID: getStrictEnvInt32("DEFAULT_GENDER_ID", 1),
 	}
 	log.Println("El ambiente es:", cfg.AppEnv)
@@ -81,8 +79,8 @@ func Load() (Config, error) {
 	if cfg.AuthTokenPrefix == "" {
 		return Config{}, errors.New("AUTH_TOKEN_PREFIX must not be empty")
 	}
-	if cfg.DefaultRoleID <= 0 || cfg.DefaultGenderID <= 0 {
-		return Config{}, errors.New("DEFAULT_ROLE_ID and DEFAULT_GENDER_ID must be greater than zero")
+	if cfg.DefaultGenderID <= 0 {
+		return Config{}, errors.New("DEFAULT_GENDER_ID must be greater than zero")
 	}
 	return cfg, nil
 

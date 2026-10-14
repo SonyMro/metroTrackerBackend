@@ -14,10 +14,11 @@ import (
 	"metry.uk/provext4/MetroTrackerBackend/internal/users/domain"
 )
 
+const invalidUserIDMessage = "invalid user id"
+
 type Handler struct {
 	createUser     *application.CreateUser
 	getUser        *application.GetUser
-	listUsers      *application.ListUsers
 	updateUser     *application.UpdateUser
 	deactivateUser *application.DeactivateUser
 	listaGeneros   *application.ListGenders
@@ -27,7 +28,6 @@ type Handler struct {
 func NewHandler(
 	createUser *application.CreateUser,
 	getUser *application.GetUser,
-	listUsers *application.ListUsers,
 	updateUser *application.UpdateUser,
 	deactivateUser *application.DeactivateUser,
 	listGenders *application.ListGenders,
@@ -35,7 +35,6 @@ func NewHandler(
 	return &Handler{
 		createUser:     createUser,
 		getUser:        getUser,
-		listUsers:      listUsers,
 		updateUser:     updateUser,
 		deactivateUser: deactivateUser,
 		listaGeneros:   listGenders,
@@ -51,7 +50,6 @@ func (h *Handler) Routes() chi.Router {
 
 	r.Post("/", h.create)
 	protected := func(r chi.Router) {
-		r.Get("/", h.list)
 		r.Get("/{id}", h.get)
 		r.Put("/{id}", h.update)
 		r.Delete("/{id}", h.deactivate)
@@ -93,7 +91,6 @@ func (h *Handler) create(
 		Apemat:   request.Apemat,
 		Correo:   request.Correo,
 		Password: request.Password,
-		IDRol:    request.IDRol,
 		IDGenero: request.IDGenero,
 	}
 
@@ -129,7 +126,7 @@ func (h *Handler) get(
 		httpx.WriteError(
 			w,
 			http.StatusBadRequest,
-			"invalid user id",
+			invalidUserIDMessage,
 		)
 
 		return
@@ -152,61 +149,6 @@ func (h *Handler) get(
 	)
 }
 
-func (h *Handler) list(
-	w http.ResponseWriter,
-	r *http.Request,
-) {
-	page := queryInt(
-		r,
-		"page",
-		1,
-	)
-
-	pageSize := queryInt(
-		r,
-		"pageSize",
-		20,
-	)
-
-	result, err := h.listUsers.Execute(
-		r.Context(),
-		page,
-		pageSize,
-	)
-
-	if err != nil {
-		h.writeDomainError(w, err)
-		return
-	}
-
-	items := make(
-		[]*UserResponse,
-		0,
-		len(result.Items),
-	)
-
-	for _, user := range result.Items {
-		items = append(
-			items,
-			toUserResponse(user),
-		)
-	}
-
-	response := UserListResponse{
-		Items:      items,
-		Page:       result.Page,
-		PageSize:   result.PageSize,
-		Total:      result.Total,
-		TotalPages: result.TotalPages,
-	}
-
-	httpx.WriteJSON(
-		w,
-		http.StatusOK,
-		response,
-	)
-}
-
 func (h *Handler) update(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -217,7 +159,7 @@ func (h *Handler) update(
 		httpx.WriteError(
 			w,
 			http.StatusBadRequest,
-			"invalid user id",
+			invalidUserIDMessage,
 		)
 
 		return
@@ -244,7 +186,6 @@ func (h *Handler) update(
 		request.Nombre,
 		request.Apepat,
 		request.Apemat,
-		request.IDRol,
 		request.IDGenero,
 	)
 
@@ -280,7 +221,7 @@ func (h *Handler) deactivate(
 		httpx.WriteError(
 			w,
 			http.StatusBadRequest,
-			"invalid user id",
+			invalidUserIDMessage,
 		)
 
 		return
@@ -423,24 +364,4 @@ func pathID(
 		return 0, errors.New("user ID must be positive")
 	}
 	return int32(value), nil
-}
-
-func queryInt(
-	r *http.Request,
-	name string,
-	fallback int,
-) int {
-	raw := r.URL.Query().Get(name)
-
-	if raw == "" {
-		return fallback
-	}
-
-	value, err := strconv.Atoi(raw)
-
-	if err != nil {
-		return fallback
-	}
-
-	return value
 }

@@ -42,7 +42,7 @@ func (uc *Login) Execute(ctx context.Context, email, password string) (*LoginRes
 }
 
 func (uc *Login) issue(ctx context.Context, user *userdomain.User) (*LoginResult, error) {
-	access, err := uc.sessions.Issue(ctx, authdomain.Identity{UserID: user.ID, RoleID: user.IDRol})
+	access, err := uc.sessions.Issue(ctx, authdomain.Identity{UserID: user.ID})
 	if err != nil {
 		return nil, err
 	}

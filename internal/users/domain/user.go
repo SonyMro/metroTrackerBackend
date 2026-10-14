@@ -13,9 +13,7 @@ type User struct {
 	Password      string
 	FechaRegistro time.Time
 	FechaAct      time.Time
-	IDRol         int32
 	IDGenero      int32
 	EsActivo      bool
-	Rol           *Role
 	Genero        *Genero
 }

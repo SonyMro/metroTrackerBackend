@@ -8,7 +8,7 @@ import (
 )
 
 type UserReader interface {
-	AuthUser(context.Context, int32) (roleID int32, active bool, err error)
+	AuthUser(context.Context, int32) (active bool, err error)
 }
 
 type AuthenticateToken struct {
@@ -33,14 +33,13 @@ func (uc *AuthenticateToken) Execute(ctx context.Context, token string) (*authdo
 	if err != nil {
 		return nil, err
 	}
-	roleID, active, err := uc.users.AuthUser(ctx, identity.UserID)
+	active, err := uc.users.AuthUser(ctx, identity.UserID)
 	if err != nil {
 		return nil, authdomain.ErrInvalidSession
 	}
 	if !active {
 		return nil, authdomain.ErrInactiveUser
 	}
-	identity.RoleID = roleID
 	return identity, nil
 }
 

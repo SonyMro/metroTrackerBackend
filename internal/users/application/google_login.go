@@ -14,12 +14,11 @@ type GoogleLogin struct {
 	verifier        domain.GoogleTokenVerifier
 	identities      domain.GoogleIdentityRepository
 	issuer          authdomain.SessionStore
-	defaultRoleID   int32
 	defaultGenderID int32
 }
 
-func NewGoogleLogin(verifier domain.GoogleTokenVerifier, identities domain.GoogleIdentityRepository, issuer authdomain.SessionStore, defaultRoleID, defaultGenderID int32) *GoogleLogin {
-	return &GoogleLogin{verifier: verifier, identities: identities, issuer: issuer, defaultRoleID: defaultRoleID, defaultGenderID: defaultGenderID}
+func NewGoogleLogin(verifier domain.GoogleTokenVerifier, identities domain.GoogleIdentityRepository, issuer authdomain.SessionStore, defaultGenderID int32) *GoogleLogin {
+	return &GoogleLogin{verifier: verifier, identities: identities, issuer: issuer, defaultGenderID: defaultGenderID}
 }
 
 type GoogleLoginResult struct {
@@ -46,14 +45,14 @@ func (uc *GoogleLogin) Execute(ctx context.Context, rawToken string) (*GoogleLog
 	if claims.Subject == "" || claims.Email == "" {
 		return nil, domain.ErrInvalidGoogleClaims
 	}
-	user, err := uc.identities.ResolveGoogleIdentity(ctx, claims, uc.defaultRoleID, uc.defaultGenderID)
+	user, err := uc.identities.ResolveGoogleIdentity(ctx, claims, uc.defaultGenderID)
 	if err != nil {
 		return nil, fmt.Errorf("resolver identidad Google: %w", err)
 	}
 	if user == nil || !user.EsActivo {
 		return nil, domain.ErrInactiveUser
 	}
-	identity := authdomain.Identity{UserID: user.ID, RoleID: user.IDRol}
+	identity := authdomain.Identity{UserID: user.ID}
 	var token, refreshToken string
 	if pairIssuer, ok := uc.issuer.(authdomain.SessionPairIssuer); ok {
 		token, refreshToken, err = pairIssuer.IssuePair(ctx, identity)

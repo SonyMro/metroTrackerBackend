@@ -16,10 +16,10 @@ type UserRepository struct{ db *pgxpool.Pool }
 func NewUserRepository(db *pgxpool.Pool) *UserRepository { return &UserRepository{db: db} }
 
 func (r *UserRepository) Create(ctx context.Context, user *domain.User) (*domain.User, error) {
-	const query = `INSERT INTO usuario (nombre, apepat, apemat, foto, correo, password, fecharegistro, fechaact, idrol, idgenero, esactivo)
-		VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), $7, $8, TRUE)
+	const query = `INSERT INTO usuario (nombre, apepat, apemat, foto, correo, password, fecharegistro, fechaact, idgenero, esactivo)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), $7, TRUE)
 		RETURNING id, fecharegistro, fechaact, esactivo`
-	err := r.db.QueryRow(ctx, query, user.Nombre, user.Apepat, user.Apemat, user.Foto, user.Correo, user.Password, user.IDRol, user.IDGenero).Scan(&user.ID, &user.FechaRegistro, &user.FechaAct, &user.EsActivo)
+	err := r.db.QueryRow(ctx, query, user.Nombre, user.Apepat, user.Apemat, user.Foto, user.Correo, user.Password, user.IDGenero).Scan(&user.ID, &user.FechaRegistro, &user.FechaAct, &user.EsActivo)
 	if err != nil {
 		return nil, fmt.Errorf("insertar usuario: %w", err)
 	}
@@ -27,7 +27,7 @@ func (r *UserRepository) Create(ctx context.Context, user *domain.User) (*domain
 }
 
 // ResolveGoogleIdentity mantiene la búsqueda, vinculación y alta en una sola transacción.
-func (r *UserRepository) ResolveGoogleIdentity(ctx context.Context, claims domain.GoogleClaims, defaultRoleID, defaultGenderID int32) (*domain.User, error) {
+func (r *UserRepository) ResolveGoogleIdentity(ctx context.Context, claims domain.GoogleClaims, defaultGenderID int32) (*domain.User, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("iniciar transacción de identidad Google: %w", err)
@@ -56,7 +56,7 @@ func (r *UserRepository) ResolveGoogleIdentity(ctx context.Context, claims domai
 		return nil, fmt.Errorf("buscar usuario por correo en transacción: %w", err)
 	}
 
-	user, err = r.createGoogleUser(ctx, tx, claims, defaultRoleID, defaultGenderID)
+	user, err = r.createGoogleUser(ctx, tx, claims, defaultGenderID)
 	if err != nil {
 		return nil, err
 	}
@@ -93,14 +93,14 @@ func (r *UserRepository) resolveGoogleIdentityByEmail(ctx context.Context, tx pg
 	return user, nil
 }
 
-func (r *UserRepository) createGoogleUser(ctx context.Context, tx pgx.Tx, claims domain.GoogleClaims, defaultRoleID, defaultGenderID int32) (*domain.User, error) {
+func (r *UserRepository) createGoogleUser(ctx context.Context, tx pgx.Tx, claims domain.GoogleClaims, defaultGenderID int32) (*domain.User, error) {
 	name := claims.Name
 	if name == "" {
 		name = claims.Email
 	}
 	var userID int32
-	const insertUser = `INSERT INTO usuario (nombre, apepat, correo, google_id, fecharegistro, fechaact, idrol, idgenero, esactivo) VALUES ($1, '-', $2, $3, NOW(), NOW(), $4, $5, TRUE) RETURNING id`
-	if err := tx.QueryRow(ctx, insertUser, name, claims.Email, claims.Subject, defaultRoleID, defaultGenderID).Scan(&userID); err != nil {
+	const insertUser = `INSERT INTO usuario (nombre, apepat, correo, google_id, fecharegistro, fechaact, idgenero, esactivo) VALUES ($1, '-', $2, $3, NOW(), NOW(), $4, TRUE) RETURNING id`
+	if err := tx.QueryRow(ctx, insertUser, name, claims.Email, claims.Subject, defaultGenderID).Scan(&userID); err != nil {
 		return nil, googleLinkError(err)
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO user_auth (user_id, provider, provider_id) VALUES ($1, 'google', $2)`, userID, claims.Subject); err != nil {
@@ -121,21 +121,15 @@ func googleLinkError(err error) error {
 	return fmt.Errorf("persistir identidad Google: %w", err)
 }
 
-const userDetailColumns = `u.id, u.nombre, u.apepat, COALESCE(u.apemat,''), u.foto, u.correo, COALESCE(u.password, ''), u.fecharegistro, u.fechaact, u.idrol, u.idgenero, u.esactivo, r.id, r.nombre, g.id, g.Tipo`
-const userListColumns = `u.id, u.nombre, u.apepat, u.apemat, u.correo, u.fecharegistro, u.fechaact, u.idrol, u.idgenero, u.esactivo, r.id, r.nombre, g.id, g.Tipo`
-const userJoins = ` FROM usuario u LEFT JOIN roles r ON r.id = u.idrol LEFT JOIN genero g ON g.id = u.idgenero `
+const userDetailColumns = `u.id, u.nombre, u.apepat, COALESCE(u.apemat,''), u.foto, u.correo, COALESCE(u.password, ''), u.fecharegistro, u.fechaact, u.idgenero, u.esactivo, g.id, g.Tipo`
+const userJoins = ` FROM usuario u LEFT JOIN genero g ON g.id = u.idgenero `
 
 func scanUser(row pgx.Row) (*domain.User, error) {
-	user := &domain.User{Rol: &domain.Role{}, Genero: &domain.Genero{}}
-	err := row.Scan(&user.ID, &user.Nombre, &user.Apepat, &user.Apemat, &user.Foto, &user.Correo, &user.Password, &user.FechaRegistro, &user.FechaAct, &user.IDRol, &user.IDGenero, &user.EsActivo, &user.Rol.ID, &user.Rol.Nombre, &user.Genero.ID, &user.Genero.Tipo)
+	user := &domain.User{Genero: &domain.Genero{}}
+	err := row.Scan(&user.ID, &user.Nombre, &user.Apepat, &user.Apemat, &user.Foto, &user.Correo, &user.Password, &user.FechaRegistro, &user.FechaAct, &user.IDGenero, &user.EsActivo, &user.Genero.ID, &user.Genero.Tipo)
 	return user, err
 }
 
-func scanListUser(row pgx.Row) (*domain.User, error) {
-	user := &domain.User{Rol: &domain.Role{}, Genero: &domain.Genero{}}
-	err := row.Scan(&user.ID, &user.Nombre, &user.Apepat, &user.Apemat, &user.Correo, &user.FechaRegistro, &user.FechaAct, &user.IDRol, &user.IDGenero, &user.EsActivo, &user.Rol.ID, &user.Rol.Nombre, &user.Genero.ID, &user.Genero.Tipo)
-	return user, err
-}
 func scanListGender(row pgx.Row) (*domain.Genero, error) {
 	genero := &domain.Genero{}
 	err := row.Scan(&genero.ID, &genero.Tipo)
@@ -154,9 +148,9 @@ func (r *UserRepository) GetByID(ctx context.Context, id int32) (*domain.User, e
 }
 
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
-	const query = `SELECT id, nombre, apepat, apemat, foto, correo, password, fecharegistro, fechaact, idrol, idgenero, esactivo FROM usuario WHERE correo = $1`
+	const query = `SELECT id, nombre, apepat, apemat, foto, correo, password, fecharegistro, fechaact, idgenero, esactivo FROM usuario WHERE correo = $1`
 	user := &domain.User{}
-	err := r.db.QueryRow(ctx, query, email).Scan(&user.ID, &user.Nombre, &user.Apepat, &user.Apemat, &user.Foto, &user.Correo, &user.Password, &user.FechaRegistro, &user.FechaAct, &user.IDRol, &user.IDGenero, &user.EsActivo)
+	err := r.db.QueryRow(ctx, query, email).Scan(&user.ID, &user.Nombre, &user.Apepat, &user.Apemat, &user.Foto, &user.Correo, &user.Password, &user.FechaRegistro, &user.FechaAct, &user.IDGenero, &user.EsActivo)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrUserNotFound
 	}
@@ -164,34 +158,6 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*domain.
 		return nil, fmt.Errorf("consultar usuario por correo: %w", err)
 	}
 	return user, nil
-}
-
-func (r *UserRepository) List(ctx context.Context, limit, offset int) ([]*domain.User, error) {
-	rows, err := r.db.Query(ctx, `SELECT `+userListColumns+userJoins+` ORDER BY u.id DESC LIMIT $1 OFFSET $2`, limit, offset)
-	if err != nil {
-		return nil, fmt.Errorf("consultar lista de usuarios: %w", err)
-	}
-	defer rows.Close()
-	users := make([]*domain.User, 0)
-	for rows.Next() {
-		user, err := scanListUser(rows)
-		if err != nil {
-			return nil, fmt.Errorf("leer usuario listado: %w", err)
-		}
-		users = append(users, user)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterar lista de usuarios: %w", err)
-	}
-	return users, nil
-}
-
-func (r *UserRepository) Count(ctx context.Context) (int, error) {
-	var total int
-	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM usuario`).Scan(&total); err != nil {
-		return 0, fmt.Errorf("contar usuarios: %w", err)
-	}
-	return total, nil
 }
 
 func (r *UserRepository) Deactivate(ctx context.Context, id int32) error {
@@ -206,7 +172,7 @@ func (r *UserRepository) Deactivate(ctx context.Context, id int32) error {
 }
 
 func (r *UserRepository) Update(ctx context.Context, user *domain.User) error {
-	result, err := r.db.Exec(ctx, `UPDATE usuario SET nombre = $1, apepat = $2, apemat = $3, idrol = $4, idgenero = $5, fechaact = NOW() WHERE id = $6`, user.Nombre, user.Apepat, user.Apemat, user.IDRol, user.IDGenero, user.ID)
+	result, err := r.db.Exec(ctx, `UPDATE usuario SET nombre = $1, apepat = $2, apemat = $3, idgenero = $4, fechaact = NOW() WHERE id = $5`, user.Nombre, user.Apepat, user.Apemat, user.IDGenero, user.ID)
 	if err != nil {
 		return fmt.Errorf("actualizar usuario: %w", err)
 	}
@@ -226,7 +192,7 @@ func (r *UserRepository) ListGeneros(ctx context.Context) ([]*domain.Genero, err
 	for rows.Next() {
 		genero, err := scanListGender(rows)
 		if err != nil {
-			return nil, fmt.Errorf("leer roles listado: %w", err)
+			return nil, fmt.Errorf("leer géneros listados: %w", err)
 		}
 		generos = append(generos, genero)
 	}

@@ -30,7 +30,7 @@ func (i *Issuer) Issue(_ context.Context, identity authdomain.Identity) (authdom
 	}
 	now := time.Now()
 	expiresAt := now.Add(i.expiration)
-	claims := jwtv5.MapClaims{"user_id": identity.UserID, "role": identity.RoleID, "iat": now.Unix(), "exp": expiresAt.Unix()}
+	claims := jwtv5.MapClaims{"user_id": identity.UserID, "iat": now.Unix(), "exp": expiresAt.Unix()}
 	token := jwtv5.NewWithClaims(jwtv5.SigningMethodHS256, claims)
 	signed, err := token.SignedString(i.secret)
 	if err != nil {
@@ -54,10 +54,6 @@ func (i *Issuer) Verify(_ context.Context, raw string) (*authdomain.Identity, er
 	if !ok || userID <= 0 {
 		return nil, authdomain.ErrInvalidSession
 	}
-	roleID, ok := numericClaim(claims, "role")
-	if !ok || roleID <= 0 {
-		return nil, authdomain.ErrInvalidSession
-	}
 	iat, ok := numericClaim(claims, "iat")
 	if !ok || iat <= 0 {
 		return nil, authdomain.ErrInvalidSession
@@ -66,7 +62,7 @@ func (i *Issuer) Verify(_ context.Context, raw string) (*authdomain.Identity, er
 	if !ok || exp <= time.Now().Unix() {
 		return nil, authdomain.ErrInvalidSession
 	}
-	return &authdomain.Identity{UserID: int32(userID), RoleID: int32(roleID), ExpiresAt: time.Unix(exp, 0)}, nil
+	return &authdomain.Identity{UserID: int32(userID), ExpiresAt: time.Unix(exp, 0)}, nil
 }
 
 func numericClaim(claims jwtv5.MapClaims, name string) (int64, bool) {

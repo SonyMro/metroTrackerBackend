@@ -34,7 +34,7 @@ func (r *MapaRepository) GetPoints(ctx context.Context) ([]*domain.PuntoMap, err
 
 		punto, err := scanListPoint(rows)
 		if err != nil {
-			return nil, fmt.Errorf("leer roles listado: %w", err)
+			return nil, fmt.Errorf("leer puntos listados: %w", err)
 
 		}
 		puntos = append(puntos, punto)
